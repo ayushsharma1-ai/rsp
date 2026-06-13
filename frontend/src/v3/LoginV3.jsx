@@ -37,9 +37,9 @@ export default function LoginV3() {
         </div>
         {error && <p className="m-error">{error}</p>}
         <Btn type="submit" variant="primary" full loading={loading}>Sign in</Btn>
-        <p className="m-muted" style={{ fontSize: '0.78rem', textAlign: 'center', margin: '2px 0 0' }}>
+        {/* <p className="m-muted" style={{ fontSize: '0.78rem', textAlign: 'center', margin: '2px 0 0' }}>
           Admin: admin@rsp.edu · admin123<br />Faculty: vivek.kant@iitk.ac.in · vivek123
-        </p>
+        </p> */}
       </form>
     </div>
   )
