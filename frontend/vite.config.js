@@ -3,6 +3,15 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',       // existing desktop UI (v1)
+        mobile: 'mobile.html',    // mobile-native PWA (v2)
+        v3: 'v3.html',            // calendar-first redesign (v3 — A/B compare)
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

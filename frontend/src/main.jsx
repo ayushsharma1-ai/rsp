@@ -13,6 +13,8 @@ import DashboardPage from './pages/DashboardPage'
 import CalendarPage from './pages/CalendarPage'
 import BookingsPage from './pages/BookingsPage'
 import ResourcesPage from './pages/ResourcesPage'
+import GroupsPage from './pages/GroupsPage'
+import RequestsPage from './pages/RequestsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import UsersPage from './pages/UsersPage'
 
@@ -37,6 +39,8 @@ function App() {
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="bookings" element={<BookingsPage />} />
           <Route path="resources" element={<ResourcesPage />} />
+          <Route path="groups" element={<GroupsPage />} />
+          <Route path="requests" element={<RequestsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
         </Route>

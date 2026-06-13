@@ -80,6 +80,7 @@ class ResourceType(str, enum.Enum):
     """
     CLASSROOM = "classroom"
     LAB = "lab"
+    COMPUTER_ROOM = "computer_room"
     SEMINAR_HALL = "seminar_hall"
     MEETING_ROOM = "meeting_room"
     EQUIPMENT = "equipment"
@@ -152,6 +153,12 @@ class EventStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
+class EventCategory(str, enum.Enum):
+    """Phase 5 — separate the fixed academic timetable from one-off ad-hoc events."""
+    ACADEMIC = "academic"   # regular coursework / fixed timetable (the baseline)
+    ADHOC = "adhoc"         # new one-off events people create
+
+
 class Event(Base):
     """
     An Event is WHAT is happening — a meeting, lecture, seminar.
@@ -186,6 +193,8 @@ class Event(Base):
 
     is_public = Column(Boolean, default=True, nullable=False)
     is_recurring_root = Column(Boolean, default=False, nullable=False)
+    category = Column(SAEnum(EventCategory), default=EventCategory.ADHOC, nullable=False)
+    color = Column(String(9), nullable=True)  # optional user-chosen hex (e.g. "#5b6ef5"); null = default venue color
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -405,4 +414,136 @@ class Feedback(Base):
     __table_args__ = (
         Index("ix_feedback_user", "user_id"),
         Index("ix_feedback_submitted", "submitted_at"),
-    ) 
+    )
+
+
+# ─────────────────────────────────────────────
+# GROUPS & ROSTER MODULE (Phase 2)
+# ─────────────────────────────────────────────
+# Why these tables?
+#   The meeting wants clash detection on STUDENTS, not just rooms. We model
+#   students as lightweight "roster people" collected into "groups" (e.g.
+#   "First-year CS"). An Event targets one or more groups. Clash on students =
+#   "do two events' rosters share anyone?" — computed by expanding groups -> people.
+#
+#   This is the textbook MANY-TO-MANY pattern, done with JUNCTION tables:
+#     groups  <--(group_members)-->  roster_people      (a person is in many groups; a group has many people)
+#     events  <--(event_groups)  -->  groups            (an event targets many groups; a group is used by many events)
+
+class RosterPerson(Base):
+    """
+    A lightweight person — usually a student. NOT necessarily an app User.
+    Just a name + optional email, with an optional link to a real User account
+    if that person ever signs in. This lets us roster a whole cohort without
+    forcing 100 logins.
+    """
+    __tablename__ = "roster_people"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    full_name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True, index=True)
+    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=True)  # optional link to a real account
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    user = relationship("User", foreign_keys=[user_id])
+    memberships = relationship("GroupMember", back_populates="person", cascade="all, delete-orphan")
+
+
+class Group(Base):
+    """A named roster of people, e.g. 'First-year CS' or 'B.Des 2025'."""
+    __tablename__ = "groups"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    group_type = Column(String(50), nullable=True)   # free-form: cohort / section / year / ...
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
+    event_links = relationship("EventGroup", back_populates="group", cascade="all, delete-orphan")
+
+
+class GroupMember(Base):
+    """
+    JUNCTION table for the many-to-many between Group and RosterPerson.
+    One row = "this person is in this group." The unique constraint stops the
+    same person being added to one group twice.
+    """
+    __tablename__ = "group_members"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    group_id = Column(UUID(as_uuid=False), ForeignKey("groups.id"), nullable=False)
+    roster_person_id = Column(UUID(as_uuid=False), ForeignKey("roster_people.id"), nullable=False)
+
+    group = relationship("Group", back_populates="members")
+    person = relationship("RosterPerson", back_populates="memberships")
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "roster_person_id", name="uq_group_member"),
+        Index("ix_group_members_group", "group_id"),
+        Index("ix_group_members_person", "roster_person_id"),
+    )
+
+
+class EventGroup(Base):
+    """
+    JUNCTION table for the many-to-many between Event and Group.
+    One row = "this event is for this group."
+    """
+    __tablename__ = "event_groups"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    event_id = Column(UUID(as_uuid=False), ForeignKey("events.id"), nullable=False)
+    group_id = Column(UUID(as_uuid=False), ForeignKey("groups.id"), nullable=False)
+
+    event = relationship("Event")
+    group = relationship("Group", back_populates="event_links")
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "group_id", name="uq_event_group"),
+        Index("ix_event_groups_event", "event_id"),
+        Index("ix_event_groups_group", "group_id"),
+    )
+
+
+# ─────────────────────────────────────────────
+# REQUEST-RELEASE MODULE (Phase 3)
+# ─────────────────────────────────────────────
+
+class ReleaseStatus(str, enum.Enum):
+    """FSM for a slot-release request."""
+    REQUESTED = "requested"
+    ACCEPTED_RELEASED = "accepted_released"   # holder freed the slot
+    ACCEPTED_MOVED = "accepted_moved"         # holder agreed to move it
+    DECLINED = "declined"                     # holder said no
+    CANCELLED = "cancelled"                   # requester withdrew
+
+
+class SlotReleaseRequest(Base):
+    """
+    A requester asks the current holder of a booked slot to release (or move) it.
+    The holder accepts in one tap (which frees the slot) or declines.
+    Replaces the manual phone-call negotiation described in the meeting notes.
+    """
+    __tablename__ = "slot_release_requests"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    booking_id = Column(UUID(as_uuid=False), ForeignKey("bookings.id"), nullable=False)   # contested slot
+    requester_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)    # who wants it
+    holder_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)       # current holder
+    message = Column(Text, nullable=True)
+    status = Column(SAEnum(ReleaseStatus), default=ReleaseStatus.REQUESTED, nullable=False)
+    response_note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    requested_event_json = Column(Text, nullable=True)            # the requester's intended event (JSON)
+    created_event_id = Column(UUID(as_uuid=False), nullable=True)  # event auto-created when accepted
+
+    booking = relationship("Booking", foreign_keys=[booking_id])
+    requester = relationship("User", foreign_keys=[requester_id])
+    holder = relationship("User", foreign_keys=[holder_id])
+
+    __table_args__ = (
+        Index("ix_release_holder", "holder_id", "status"),
+        Index("ix_release_requester", "requester_id"),
+    )

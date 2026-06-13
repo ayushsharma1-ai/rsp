@@ -9,7 +9,7 @@ Future: replace bus.subscribe with a Redis/Celery task queue for async delivery.
 """
 
 from sqlalchemy.orm import Session
-from app.modules.models import Notification, NotificationType, User, Booking
+from app.modules.models import Notification, NotificationType, User, Booking, SlotReleaseRequest, Event
 from app.core.events import bus
 from app.core.database import SessionLocal
 
@@ -119,10 +119,96 @@ def on_booking_cancelled(payload: dict):
         db.close()
 
 
+def on_release_requested(payload: dict):
+    db = _get_db()
+    try:
+        req = db.query(SlotReleaseRequest).filter(SlotReleaseRequest.id == payload.get("request_id")).first()
+        if not req:
+            return
+        _notify(
+            db, req.holder_id, NotificationType.EVENT_UPDATED,
+            "Slot requested",
+            "Someone requested a slot you hold. Open Requests to accept or decline.",
+            booking_id=req.booking_id,
+        )
+    finally:
+        db.close()
+
+
+def on_release_accepted(payload: dict):
+    db = _get_db()
+    try:
+        req = db.query(SlotReleaseRequest).filter(SlotReleaseRequest.id == payload.get("request_id")).first()
+        if not req:
+            return
+        _notify(
+            db, req.requester_id, NotificationType.EVENT_UPDATED,
+            "Slot request accepted",
+            "Your slot request was accepted — the slot is now free to book.",
+            booking_id=req.booking_id,
+        )
+    finally:
+        db.close()
+
+
+def on_release_declined(payload: dict):
+    db = _get_db()
+    try:
+        req = db.query(SlotReleaseRequest).filter(SlotReleaseRequest.id == payload.get("request_id")).first()
+        if not req:
+            return
+        _notify(
+            db, req.requester_id, NotificationType.EVENT_UPDATED,
+            "Slot request declined",
+            "Your slot request was declined.",
+            booking_id=req.booking_id,
+        )
+    finally:
+        db.close()
+
+
+def on_event_created(payload: dict):
+    """Someone scheduled a new event — tell every other active user, with the
+    event's details, so faculty see each other's new bookings without reloading."""
+    db = _get_db()
+    try:
+        event = db.query(Event).filter(Event.id == payload.get("event_id")).first()
+        if not event:
+            return
+        organizer = db.query(User).filter(User.id == event.organizer_id).first()
+        who = organizer.full_name if organizer else "Someone"
+        try:
+            when = event.start_time.strftime("%b %d, %H:%M")
+        except Exception:
+            when = ""
+        # everyone except the creator (and only active accounts)
+        recipients = db.query(User).filter(
+            User.id != event.organizer_id,
+            User.is_active == True,  # noqa: E712
+        ).all()
+        for r in recipients:
+            n = Notification(
+                recipient_id=r.id,
+                notification_type=NotificationType.EVENT_UPDATED,
+                title=f"New event: {event.title}",
+                message=f"{who} scheduled “{event.title}” on {when}." if when
+                        else f"{who} scheduled “{event.title}”.",
+                related_event_id=event.id,
+            )
+            db.add(n)
+        db.commit()
+    finally:
+        db.close()
+
+
 def register_handlers():
     """Called once at app startup. Wires domain events → notification handlers."""
     bus.subscribe("booking.pending", on_booking_pending)
+    bus.subscribe("event.created", on_event_created)
     bus.subscribe("booking.confirmed", on_booking_confirmed)
     bus.subscribe("booking.approved", on_booking_approved)
     bus.subscribe("booking.rejected", on_booking_rejected)
     bus.subscribe("booking.cancelled", on_booking_cancelled)
+    bus.subscribe("release.requested", on_release_requested)
+    bus.subscribe("release.accepted", on_release_accepted)
+    bus.subscribe("release.declined", on_release_declined)

@@ -48,6 +48,7 @@ export default function CalendarPage() {
   const [selected, setSelected]     = useState(null)
   const [dragErr, setDragErr]       = useState('')
   const [saving, setSaving]         = useState(null) // composite key of block being saved
+  const [moveReq, setMoveReq]       = useState(null) // {eventId,start,end,venues} when a drag hits a taken slot
 
   // Refs for drag/resize — not state because mouse handlers
   // need current values without stale closures
@@ -191,6 +192,16 @@ export default function CalendarPage() {
     }
   }, [localEvts, getDayAndMinutes, days])
 
+  // Drag landed on a taken slot → look up who holds it and offer a release request
+  const offerRequest = useCallback(async (eventId, start, end) => {
+    try {
+      const r = await api.get(`/clashes/event/${eventId}`, { params: { start, end } })
+      const venues = (r.data || []).flatMap(c => c.venue_bookings || [])
+      if (venues.length) { setMoveReq({ eventId, start, end, venues }); return true }
+    } catch (e) { /* ignore */ }
+    return false
+  }, [])
+
   // ── Mouse up — persist to backend ─────────────────────────
   const handleMouseUp = useCallback(async () => {
 
@@ -229,15 +240,18 @@ export default function CalendarPage() {
         await api.patch(`/events/${eventId}`, payload)
         fetchEvents()
      } catch (err) {
-        console.log('DRAG ERROR full:', err)
-        console.log('DRAG ERROR response:', err.response)
-        console.log('DRAG ERROR data:', err.response?.data)
-        console.log('DRAG ERROR status:', err.response?.status)
+        // revert the optimistic move
         setLocalEvts(prev => prev.map(ev =>
           ev.key === key ? { ...ev, start: origStart, end: origEnd } : ev
         ))
-        setDragErr(err.response?.data?.detail || `Error ${err.response?.status}: ${JSON.stringify(err.response?.data)}`)
-        setTimeout(() => setDragErr(''), 8000)
+        // if the new slot is held by someone, offer to request it (move my event here)
+        const offered = err.response?.status === 409
+          ? await offerRequest(eventId, moved.start, moved.end)
+          : false
+        if (!offered) {
+          setDragErr(err.response?.data?.detail || `Error ${err.response?.status}`)
+          setTimeout(() => setDragErr(''), 8000)
+        }
       } finally {
         setSaving(null)
       }
@@ -277,13 +291,18 @@ export default function CalendarPage() {
         setLocalEvts(prev => prev.map(ev =>
           ev.key === key ? { ...ev, start: origStart, end: origEnd } : ev
         ))
-        setDragErr(err.response?.data?.detail || 'Could not save — conflict or permission error')
-        setTimeout(() => setDragErr(''), 4000)
+        const offered = err.response?.status === 409
+          ? await offerRequest(eventId, resized.start, resized.end)
+          : false
+        if (!offered) {
+          setDragErr(err.response?.data?.detail || 'Could not save — conflict or permission error')
+          setTimeout(() => setDragErr(''), 4000)
+        }
       } finally {
         setSaving(null)
       }
     }
-  }, [localEvts, fetchEvents])
+  }, [localEvts, fetchEvents, offerRequest])
 
   useEffect(() => {
     window.addEventListener('mousemove', handleMouseMove)
@@ -546,7 +565,51 @@ export default function CalendarPage() {
         resources={resources}
         onCreated={() => { setShowCreate(false); fetchEvents() }}
       />
+
+      <MoveRequestModal data={moveReq} onClose={() => setMoveReq(null)} />
     </div>
+  )
+}
+
+// ── "Slot taken → request it" modal (when you drag onto a held slot) ───
+function MoveRequestModal({ data, onClose }) {
+  const [sent, setSent] = useState({})
+  useEffect(() => { setSent({}) }, [data])
+  if (!data) return null
+  const send = async (vb) => {
+    try {
+      await api.post('/release-requests', {
+        booking_id: vb.booking_id,
+        message: '',
+        proposed_event: {
+          move_event_id: data.eventId,
+          start_time: data.start,
+          end_time: data.end,
+        },
+      })
+      setSent(s => ({ ...s, [vb.booking_id]: true }))
+    } catch (e) { /* ignore */ }
+  }
+  return (
+    <Modal open title="That slot is taken — request it?" onClose={onClose} width={460}>
+      <p style={{ fontSize: '0.85rem', opacity: 0.8, margin: '0 0 0.75rem' }}>
+        Send a request to move your event here. If the holder accepts, your event is moved into
+        this slot automatically.
+      </p>
+      {data.venues.map(vb => (
+        <div key={vb.booking_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0' }}>
+          <span style={{ fontSize: '0.9rem' }}>
+            Room <strong>{vb.resource_name}</strong> · held by {vb.holder_name}
+          </span>
+          {sent[vb.booking_id]
+            ? <em style={{ color: '#15803d' }}>sent ✓</em>
+            : <Btn onClick={() => send(vb)}>Send request</Btn>}
+        </div>
+      ))}
+      <div className="form-actions">
+        <Btn variant="ghost" onClick={onClose}>Close</Btn>
+      </div>
+    </Modal>
   )
 }
 

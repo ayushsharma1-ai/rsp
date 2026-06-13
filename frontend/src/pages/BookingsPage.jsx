@@ -131,6 +131,7 @@ export default function BookingsPage() {
         <BookingDetailModal
           booking={selected}
           isAdmin={isAdmin}
+          currentUserId={user?.id}
           onClose={() => setSelected(null)}
           onApprove={id => reviewBooking(id, 'approved')}
           onReject={id => reviewBooking(id, 'rejected')}
@@ -152,7 +153,15 @@ export default function BookingsPage() {
 }
 
 // ── Detail Modal ──────────────────────────────────────────────
-function BookingDetailModal({ booking: b, isAdmin, onClose, onApprove, onReject, onCancel, onEdit }) {
+function BookingDetailModal({ booking: b, isAdmin, currentUserId, onClose, onApprove, onReject, onCancel, onEdit }) {
+  const [requested, setRequested] = useState(false)
+  // You can request a slot you don't already hold, if it's still active.
+  const canRequest = b.requester_id && b.requester_id !== currentUserId &&
+    ['pending', 'confirmed', 'approved'].includes(b.status)
+  const requestSlot = async () => {
+    try { await api.post('/release-requests', { booking_id: b.id, message: '' }); setRequested(true) }
+    catch (e) { /* ignore */ }
+  }
   return (
     <Modal open title="Booking Details" onClose={onClose} width={480}>
       <div className="detail-grid">
@@ -188,6 +197,11 @@ function BookingDetailModal({ booking: b, isAdmin, onClose, onApprove, onReject,
             </Btn>
           </>
         )}
+        {canRequest && (
+          requested
+            ? <Badge label="Request sent ✓" />
+            : <Btn variant="ghost" onClick={requestSlot}>Request this slot</Btn>
+        )}
       </div>
     </Modal>
   )
@@ -209,12 +223,31 @@ function EditBookingModal({ booking: b, onClose, onSaved }) {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
+  const [clashes, setClashes] = useState([])
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Preview clashes (room + students) at the NEW time as the user edits
+  useEffect(() => {
+    if (!b.event_id) return
+    const startISO = new Date(`${form.date}T${form.start_time}`).toISOString()
+    const endISO   = new Date(`${form.date}T${form.end_time}`).toISOString()
+    if (new Date(endISO) <= new Date(startISO)) { setClashes([]); return }
+    let cancelled = false
+    api.get(`/clashes/event/${b.event_id}`, { params: { start: startISO, end: endISO } })
+      .then(r => { if (!cancelled) setClashes(r.data) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [form.date, form.start_time, form.end_time, b.event_id])
 
   const submit = async e => {
     e.preventDefault()
     setError('')
+    // Student clash is a hard block (policy) — stop before hitting the server.
+    if (clashes.some(c => c.student_clash)) {
+      setError('This time clashes with students already booked elsewhere — pick a different slot.')
+      return
+    }
     setLoading(true)
     try {
       const startISO = new Date(`${form.date}T${form.start_time}`).toISOString()
@@ -281,6 +314,22 @@ function EditBookingModal({ booking: b, onClose, onSaved }) {
           />
         </Field>
 
+        {clashes.length > 0 && (
+          <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#7c2d12' }}>
+            <strong style={{ color: '#c2410c' }}>
+              ⚠ New time clashes with {clashes.length} event{clashes.length > 1 ? 's' : ''}:
+            </strong>
+            <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.2rem' }}>
+              {clashes.map(c => (
+                <li key={c.event_id}>
+                  <strong>{c.title}</strong>
+                  {c.venue_clash && <span> · same room</span>}
+                  {c.student_clash && <span> · {c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {error && <p className="form-error">{error}</p>}
 
         <div className="form-actions">

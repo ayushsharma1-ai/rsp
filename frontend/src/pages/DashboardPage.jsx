@@ -43,9 +43,14 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
     end_time: fmtLocal(endDefault).slice(11),
     is_public: true,
     selectedResources: [],
+    selectedGroups: [],
+    category: 'adhoc',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [groups, setGroups] = useState([])
+  const [clashes, setClashes] = useState([])
+  const [requested, setRequested] = useState({})   // booking_id -> true once a release request is sent
 
   // Reset form when modal opens
   useEffect(() => {
@@ -59,10 +64,33 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
         end_time: fmtLocal(e2).slice(11),
         is_public: true,
         selectedResources: [],
+        selectedGroups: [],
+        category: 'adhoc',
       })
       setError('')
+      setClashes([])
+      setRequested({})
+      api.get('/groups').then(r => setGroups(r.data)).catch(() => {})
     }
   }, [open])
+
+  // Clash preview: whenever the time window, resources, or groups change,
+  // ask the backend whether this proposed event would clash with anything.
+  useEffect(() => {
+    if (!open) return
+    const resourceIds = form.selectedResources.map(r => r.resource_id).filter(Boolean)
+    if (!form.date || !form.start_time || !form.end_time) { setClashes([]); return }
+    if (resourceIds.length === 0 && form.selectedGroups.length === 0) { setClashes([]); return }
+    const startISO = new Date(`${form.date}T${form.start_time}`).toISOString()
+    const endISO = new Date(`${form.date}T${form.end_time}`).toISOString()
+    if (new Date(endISO) <= new Date(startISO)) { setClashes([]); return }
+    let cancelled = false
+    api.post('/clashes/preview', {
+      start_time: startISO, end_time: endISO,
+      group_ids: form.selectedGroups, resource_ids: resourceIds,
+    }).then(r => { if (!cancelled) setClashes(r.data) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [open, form.date, form.start_time, form.end_time, form.selectedResources, form.selectedGroups])
 
   const set = k => e => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value
@@ -82,9 +110,36 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
       return { ...f, selectedResources: r }
     })
 
+  const sendRequest = async (bookingId, resourceId) => {
+    try {
+      const startISO = new Date(`${form.date}T${form.start_time}`).toISOString()
+      const endISO = new Date(`${form.date}T${form.end_time}`).toISOString()
+      await api.post('/release-requests', {
+        booking_id: bookingId,
+        message: '',
+        // capture what the requester is trying to book, so accept can auto-create it
+        proposed_event: {
+          title: form.title || 'Requested event',
+          description: form.description || '',
+          start_time: startISO,
+          end_time: endISO,
+          resource_id: resourceId,
+          group_ids: form.selectedGroups,
+          category: form.category,
+        },
+      })
+      setRequested(prev => ({ ...prev, [bookingId]: true }))
+    } catch (e) { /* ignore */ }
+  }
+
   const submit = async e => {
     e.preventDefault()
     setError('')
+    // Student clashes are a hard block (policy) — stop before hitting the server.
+    if (clashes.some(c => c.student_clash)) {
+      setError('This time clashes with students already booked elsewhere — pick a different slot.')
+      return
+    }
     setLoading(true)
     try {
       const startISO = new Date(`${form.date}T${form.start_time}`).toISOString()
@@ -112,6 +167,8 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
         end_time: endISO,
         is_public: form.is_public,
         bookings,
+        group_ids: form.selectedGroups,
+        category: form.category,
       })
       onCreated()
     } catch (err) {
@@ -150,6 +207,13 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
             onChange={set('location')}
             placeholder="e.g. Building A, Room 101"
           />
+        </Field>
+
+        <Field label="Category">
+          <select value={form.category} onChange={set('category')}>
+            <option value="adhoc">Ad-hoc event</option>
+            <option value="academic">Academic / timetable</option>
+          </select>
         </Field>
 
         {/* Google-Calendar-style date + time picker */}
@@ -214,6 +278,63 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
             </button>
           </div>
         </Field>
+
+        <Field label="Groups (for clash detection)">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {groups.length === 0 && (
+              <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+                No groups yet — create some on the Groups page.
+              </span>
+            )}
+            {groups.map(g => {
+              const checked = form.selectedGroups.includes(g.id)
+              return (
+                <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => setForm(f => ({
+                      ...f,
+                      selectedGroups: checked
+                        ? f.selectedGroups.filter(id => id !== g.id)
+                        : [...f.selectedGroups, g.id],
+                    }))}
+                    style={{ width: 'auto' }}
+                  />
+                  {g.name}
+                </label>
+              )
+            })}
+          </div>
+        </Field>
+
+        {clashes.length > 0 && (
+          <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#7c2d12' }}>
+            <strong style={{ color: '#c2410c' }}>
+              ⚠ {clashes.length} possible clash{clashes.length > 1 ? 'es' : ''} at this time:
+            </strong>
+            <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.2rem' }}>
+              {clashes.map(c => (
+                <li key={c.event_id}>
+                  <strong>{c.title}</strong>
+                  {c.venue_clash && <span> · same room</span>}
+                  {c.student_clash && <span> · {c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
+                  {(c.venue_bookings || []).map(vb => (
+                    <div key={vb.booking_id} style={{ marginTop: '0.2rem' }}>
+                      Room <strong>{vb.resource_name}</strong> held by {vb.holder_name} —{' '}
+                      {requested[vb.booking_id]
+                        ? <em style={{ color: '#15803d' }}>request sent ✓</em>
+                        : <button type="button" onClick={() => sendRequest(vb.booking_id, vb.resource_id)}
+                            style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                            Send request
+                          </button>}
+                    </div>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <Field>
           <label className="checkbox-label">

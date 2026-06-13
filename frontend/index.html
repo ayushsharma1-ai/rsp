@@ -1,6 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+      /* Device-based version routing (runs before the app bundle loads):
+         • phones / tablets → v3 (mobile redesign at /v3.html)
+         • desktops         → this page (current v1 UI)
+         Override: open the site once with ?desktop or ?mobile to pin a choice. */
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search);
+          if (p.has('desktop')) localStorage.setItem('rsp-view', 'desktop');
+          if (p.has('mobile'))  localStorage.setItem('rsp-view', 'mobile');
+          var pick = localStorage.getItem('rsp-view');
+          if (pick === 'desktop') return;                 // pinned to desktop → stay on v1
+          var ua = navigator.userAgent || '';
+          var mobileUA = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+          var iPadOS = /iPad|Macintosh/.test(ua) && 'ontouchend' in document; // iPadOS poses as Mac
+          var coarseSmall = window.matchMedia &&
+            window.matchMedia('(max-width: 768px) and (pointer: coarse)').matches;
+          if (pick === 'mobile' || mobileUA || iPadOS || coarseSmall) {
+            location.replace('/v3.html');
+          }
+        } catch (e) { /* if anything fails, just show v1 */ }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RSP — Resource Scheduling Platform</title>

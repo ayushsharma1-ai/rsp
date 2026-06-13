@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import {
   LayoutDashboard, CalendarDays, BookOpen,
-  Building2, Users, Bell, LogOut, Menu, X, ChevronRight
+  Building2, Users, Bell, LogOut, Menu, X, ChevronRight, GraduationCap, ArrowLeftRight
 } from 'lucide-react'
 import { Badge } from '../ui'
 import FeedbackWidget from '../FeedbackWidget'
@@ -12,6 +12,8 @@ const NAV = [
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/bookings', icon: BookOpen, label: 'Bookings' },
   { to: '/resources', icon: Building2, label: 'Resources' },
+  { to: '/groups', icon: GraduationCap, label: 'Groups' },
+  { to: '/requests', icon: ArrowLeftRight, label: 'Requests' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
 ]
 

@@ -19,9 +19,11 @@ from app.core.recurrence import check_recurring_conflict, expand_rrule
 
 from app.modules.models import (
     Booking, BookingStatus, Resource, Event, User, AuditLog,
-    Notification, NotificationType, EventStatus
+    Notification, NotificationType, EventStatus, EventGroup, EventCategory
 )
 from app.core.events import bus
+from app.modules.availability.service import AvailabilityService
+from app.modules.clash.service import ClashService
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────
@@ -35,6 +37,7 @@ class RecurringEventCreate(BaseModel):
     resource_id: Optional[str] = None
     is_public: bool = True
     notes: Optional[str] = None
+    group_ids: List[str] = []          # Fix-4: cohorts this recurring series is for
 
 class BookingCreate(BaseModel):
     resource_id: str
@@ -50,6 +53,9 @@ class EventCreate(BaseModel):
     end_time: datetime
     is_public: bool = True
     bookings: List[BookingCreate] = []
+    group_ids: List[str] = []          # Phase 2: cohorts/groups this event is for
+    category: str = "adhoc"            # Phase 5: 'academic' or 'adhoc'
+    color: Optional[str] = None        # v3: optional user-chosen hex color
 
 
 class EventOut(BaseModel):
@@ -113,6 +119,19 @@ class BookingService:
         if data.end_time <= data.start_time:
             raise HTTPException(status_code=400, detail="end_time must be after start_time")
 
+        # Hard block on STUDENT clash (policy 2026-06-10): if this event's groups share any
+        # students with another event at the same time, refuse it — pick a different slot.
+        if data.group_ids:
+            resource_ids = [b.resource_id for b in data.bookings]
+            for c in ClashService(self.db).find_clashes(
+                data.start_time, data.end_time, data.group_ids, resource_ids):
+                if c.student_clash:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(f"Student clash: {c.shared_student_count} student(s) already have "
+                                f"'{c.title}' at this time. Pick a different slot."),
+                    )
+
         event = Event(
             title=data.title,
             description=data.description,
@@ -121,12 +140,19 @@ class BookingService:
             end_time=data.end_time,
             is_public=data.is_public,
             status=EventStatus.CONFIRMED,
+            category=EventCategory(data.category) if data.category in ("academic", "adhoc") else EventCategory.ADHOC,
+            color=data.color,
         )
         self.db.add(event)
         self.db.flush()  # get event.id without committing
 
         for b in data.bookings:
             self._create_booking(event, b, actor)
+
+        # Phase 2: link this event to the groups (cohorts) it targets, so clash
+        # detection can expand event -> groups -> people later.
+        for group_id in (data.group_ids or []):
+            self.db.add(EventGroup(event_id=event.id, group_id=group_id))
 
         self._audit(actor, "event.created", "Event", event.id, None,
                     {"title": data.title, "start_time": str(data.start_time)})
@@ -154,71 +180,14 @@ class BookingService:
         if not resource:
             raise HTTPException(status_code=404, detail=f"Resource {data.resource_id} not found")
 
-        # Pessimistic lock: lock any overlapping confirmed/approved bookings
-# ── CHECK 1: conflict with existing one-off bookings ─────────
-# Only checks non-template bookings — recurring templates
-# are handled separately below because their stored start/end
-# only represents the first occurrence, not all occurrences.
-        conflict = self.db.query(Booking).filter(
-            Booking.resource_id == data.resource_id,
-            Booking.is_recurring_template == False,
-            Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.APPROVED, BookingStatus.PENDING]),
-            Booking.start_time < data.end_time,
-            Booking.end_time > data.start_time,
-        ).with_for_update().first()
-
+        # Conflict detection now lives in AvailabilityService, so this WRITE path and
+        # every READ path (room colours, search, free-slots) share ONE overlap rule.
+        # lock=True keeps the race protection (SELECT ... FOR UPDATE) for creation.
+        conflict = AvailabilityService(self.db).find_conflict(
+            data.resource_id, data.start_time, data.end_time, lock=True
+        )
         if conflict:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Resource '{resource.name}' is already booked from "
-                    f"{conflict.start_time.strftime('%b %d, %H:%M')} to "
-                    f"{conflict.end_time.strftime('%H:%M')}"
-            )
-
-        # ── CHECK 2: conflict with recurring template bookings ────────
-        # Fetch all active recurring templates for this resource.
-        # For each one, expand its RRULE within the requested time window
-        # and check if any generated occurrence overlaps.
-        recurring_templates = self.db.query(Booking).filter(
-            Booking.resource_id == data.resource_id,
-            Booking.is_recurring_template == True,
-            Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.APPROVED, BookingStatus.PENDING]),
-        ).all()
-
-        for template in recurring_templates:
-            # A template must have a recurrence rule attached
-            if not template.recurrence_rule:
-                continue
-
-            # Duration comes from the template's own start/end
-            # (these store the first occurrence's times,
-            #  so end - start = duration of each lecture)
-            template_duration = template.end_time - template.start_time
-
-            conflicting_occurrence = check_recurring_conflict(
-                rrule_string=template.recurrence_rule.rrule,
-                dtstart=template.start_time,
-                duration=template_duration,
-                requested_start=data.start_time,
-                requested_end=data.end_time,
-            )
-
-            if conflicting_occurrence:
-                occ_start, occ_end = conflicting_occurrence
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Resource '{resource.name}' has a recurring booking "
-                        f"('{template.event.title if template.event else 'Recurring event'}') "
-                        f"that conflicts on "
-                        f"{occ_start.strftime('%a, %b %d at %H:%M')}–"
-                        f"{occ_end.strftime('%H:%M')}"
-                )
-
-        if conflict:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Resource '{resource.name}' is already booked from {conflict.start_time} to {conflict.end_time}"
-            )
+            raise HTTPException(status_code=409, detail=conflict.message)
 
         # Determine initial status based on resource policy
         initial_status = (
@@ -399,6 +368,7 @@ class BookingService:
         actor: 'User',
         is_public: bool = True,
         notes: Optional[str] = None,
+        group_ids: Optional[List[str]] = None,
     ) -> dict:
         """
         Creates a recurring event series.
@@ -477,6 +447,10 @@ class BookingService:
         self.db.add(event)
         self.db.flush()   # get event.id
 
+        # Fix-4: link the recurring event to its target groups (for student-clash detection)
+        for group_id in (group_ids or []):
+            self.db.add(EventGroup(event_id=event.id, group_id=group_id))
+
         booking_template = None
 
         # 3. Create the booking template (if resource requested)
@@ -488,54 +462,13 @@ class BookingService:
             if not resource:
                 raise HTTPException(status_code=404, detail="Resource not found")
 
-            # Check every generated occurrence against existing bookings
-            # We reuse _create_booking's logic via check_recurring_conflict
-            # but in reverse — new recurring vs existing one-offs
-            existing_oneoffs = self.db.query(Booking).filter(
-                Booking.resource_id == resource_id,
-                Booking.is_recurring_template == False,
-                Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.APPROVED, BookingStatus.PENDING]),
-                Booking.start_time < series_end_dt,
-                Booking.end_time > series_start,
-            ).all()
-
-            for occurrence_start, occurrence_end in test_occurrences:
-                for existing in existing_oneoffs:
-                    # Standard overlap
-                    if existing.start_time < occurrence_end and existing.end_time > occurrence_start:
-                        raise HTTPException(
-                            status_code=409,
-                            detail=f"Recurring series conflicts with an existing booking "
-                                f"on {occurrence_start.strftime('%a, %b %d at %H:%M')}. "
-                                f"Resolve that conflict first."
-                        )
-
-            # Also check against OTHER recurring templates for same resource
-            other_recurring = self.db.query(Booking).filter(
-                Booking.resource_id == resource_id,
-                Booking.is_recurring_template == True,
-                Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.APPROVED, BookingStatus.PENDING]),
-            ).all()
-
-            for other in other_recurring:
-                if not other.recurrence_rule:
-                    continue
-                other_duration = other.end_time - other.start_time
-                for occurrence_start, occurrence_end in test_occurrences:
-                    conflicting = check_recurring_conflict(
-                        rrule_string=other.recurrence_rule.rrule,
-                        dtstart=other.start_time,
-                        duration=other_duration,
-                        requested_start=occurrence_start,
-                        requested_end=occurrence_end,
-                    )
-                    if conflicting:
-                        occ_s, occ_e = conflicting
-                        raise HTTPException(
-                            status_code=409,
-                            detail=f"Recurring series conflicts with another recurring booking "
-                                f"on {occ_s.strftime('%a, %b %d at %H:%M')}."
-                        )
+            # Check every generated occurrence against the room's schedule
+            # (one-off + other recurring), via the shared helper used by edit too.
+            conflict_msg = self._recurring_series_conflicts(
+                resource_id, test_occurrences, series_start, series_end_dt
+            )
+            if conflict_msg:
+                raise HTTPException(status_code=409, detail=conflict_msg)
 
             # All clear — create the template booking
             initial_status = (
@@ -573,6 +506,60 @@ class BookingService:
             "resource_id":       resource_id,
             "booking_status":    booking_template.status.value if booking_template else None,
         }
+
+    def _recurring_series_conflicts(self, resource_id, occurrences, window_start, window_end,
+                                    exclude_template_id=None):
+        """
+        Does a recurring series clash with anything already in this room's schedule?
+
+        `occurrences` = the (start, end) slots the series generates in
+        [window_start, window_end]. We check each slot against:
+          (a) existing one-off bookings, and
+          (b) other recurring templates (expanded via their own rule).
+        Returns a ready-to-show 409 message, or None if all clear.
+        `exclude_template_id` skips the series' OWN template (used when editing it).
+        """
+        active = [BookingStatus.CONFIRMED, BookingStatus.APPROVED, BookingStatus.PENDING]
+
+        # (a) vs one-off bookings overlapping the series window
+        oneoffs = self.db.query(Booking).filter(
+            Booking.resource_id == resource_id,
+            Booking.is_recurring_template == False,
+            Booking.status.in_(active),
+            Booking.start_time < window_end,
+            Booking.end_time > window_start,
+        ).all()
+        for occ_s, occ_e in occurrences:
+            for ex in oneoffs:
+                if ex.start_time < occ_e and ex.end_time > occ_s:
+                    return (f"Recurring series conflicts with an existing booking on "
+                            f"{occ_s.strftime('%a, %b %d at %H:%M')}. Resolve that conflict first.")
+
+        # (b) vs other recurring templates on the same resource
+        others_q = self.db.query(Booking).filter(
+            Booking.resource_id == resource_id,
+            Booking.is_recurring_template == True,
+            Booking.status.in_(active),
+        )
+        if exclude_template_id:
+            others_q = others_q.filter(Booking.id != exclude_template_id)
+        for other in others_q.all():
+            if not other.recurrence_rule:
+                continue
+            other_duration = other.end_time - other.start_time
+            for occ_s, occ_e in occurrences:
+                hit = check_recurring_conflict(
+                    rrule_string=other.recurrence_rule.rrule,
+                    dtstart=other.start_time,
+                    duration=other_duration,
+                    requested_start=occ_s,
+                    requested_end=occ_e,
+                )
+                if hit:
+                    hs, he = hit
+                    return (f"Recurring series conflicts with another recurring booking on "
+                            f"{hs.strftime('%a, %b %d at %H:%M')}.")
+        return None
 
     def _audit(self, actor, action, entity_type, entity_id, old, new):
         log = AuditLog(
@@ -849,20 +836,26 @@ def _update_booking(self, booking_id: str, data: 'BookingUpdate', actor: 'User')
     if new_end <= new_start:
         raise HTTPException(status_code=400, detail="end_time must be after start_time")
 
-    # Re-check conflict if times changed
+    # Re-check conflict if times changed — reuse the shared, recurring-aware engine
     if data.start_time or data.end_time:
-        conflict = self.db.query(Booking).filter(
-            Booking.resource_id == booking.resource_id,
-            Booking.id != booking_id,
-            Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.APPROVED, BookingStatus.PENDING]),
-            Booking.start_time < new_end,
-            Booking.end_time > new_start,
-        ).with_for_update().first()
+        conflict = AvailabilityService(self.db).find_conflict(
+            booking.resource_id, new_start, new_end, lock=True, exclude_booking_id=booking_id
+        )
         if conflict:
-            raise HTTPException(
-                status_code=409,
-                detail=f"New time conflicts with an existing booking"
-            )
+            raise HTTPException(status_code=409, detail=conflict.message)
+
+        # Hard block on STUDENT clash when moving the booking (policy 2026-06-10)
+        group_ids = [eg.group_id for eg in
+                     self.db.query(EventGroup).filter(EventGroup.event_id == booking.event_id).all()]
+        if group_ids:
+            for c in ClashService(self.db).find_clashes(
+                    new_start, new_end, group_ids, [booking.resource_id],
+                    exclude_event_id=booking.event_id):
+                if c.student_clash:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(f"Student clash: {c.shared_student_count} student(s) already have "
+                                f"'{c.title}' at this time. Pick a different slot."))
 
     old = {"start_time": str(booking.start_time), "end_time": str(booking.end_time), "notes": booking.notes}
     if data.start_time:
@@ -889,6 +882,7 @@ class EventUpdate(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    color: Optional[str] = None        # v3: optional user-chosen hex color
 
 
 def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occurrence_date: datetime = None) -> dict:
@@ -924,12 +918,29 @@ def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occur
         if new_end <= new_start:
             raise HTTPException(status_code=400, detail="end_time must be after start_time")
 
+        # Re-check the whole series against each room's schedule at the NEW time
+        # (uses the same shared helper as create_recurring_event).
+        if (data.start_time or data.end_time) and event.recurrence_rule:
+            win_start = event.recurrence_rule.start_date or new_start
+            win_end = event.recurrence_rule.end_date or (new_start + timedelta(days=365))
+            new_occ = expand_rrule(event.recurrence_rule.rrule, new_start,
+                                   new_end - new_start, win_start, win_end)
+            for tb in event.bookings:
+                if (tb.is_recurring_template and tb.resource_id
+                        and tb.status not in (BookingStatus.CANCELLED, BookingStatus.REJECTED)):
+                    msg = self._recurring_series_conflicts(
+                        tb.resource_id, new_occ, win_start, win_end, exclude_template_id=tb.id
+                    )
+                    if msg:
+                        raise HTTPException(status_code=409, detail=msg)
+
         old = {"start_time": str(event.start_time), "end_time": str(event.end_time)}
 
         if data.start_time:      event.start_time   = data.start_time
         if data.end_time:        event.end_time      = data.end_time
         if data.title:           event.title         = data.title
         if data.description is not None: event.description = data.description
+        if data.color is not None:       event.color       = data.color or None
 
         # Cascade to template booking
         for booking in event.bookings:
@@ -961,15 +972,29 @@ def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occur
             raise HTTPException(status_code=400, detail="end_time must be after start_time")
 
         if data.start_time or data.end_time:
-            conflict = self.db.query(Booking).filter(
-                Booking.resource_id.in_([b.resource_id for b in event.bookings]),
-                Booking.id.notin_([b.id for b in event.bookings]),
-                Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.APPROVED, BookingStatus.PENDING]),
-                Booking.start_time < new_end,
-                Booking.end_time   > new_start,
-            ).with_for_update().first()
-            if conflict:
-                raise HTTPException(status_code=409, detail="New time conflicts with an existing booking")
+            av = AvailabilityService(self.db)
+            for b in event.bookings:
+                if b.status in (BookingStatus.CANCELLED, BookingStatus.REJECTED):
+                    continue
+                conflict = av.find_conflict(
+                    b.resource_id, new_start, new_end, lock=True, exclude_booking_id=b.id
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail=conflict.message)
+
+            # Hard block on STUDENT clash when moving the event (policy 2026-06-10)
+            group_ids = [eg.group_id for eg in
+                         self.db.query(EventGroup).filter(EventGroup.event_id == event.id).all()]
+            if group_ids:
+                resource_ids = [b.resource_id for b in event.bookings
+                                if b.status not in (BookingStatus.CANCELLED, BookingStatus.REJECTED)]
+                for c in ClashService(self.db).find_clashes(
+                        new_start, new_end, group_ids, resource_ids, exclude_event_id=event.id):
+                    if c.student_clash:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(f"Student clash: {c.shared_student_count} student(s) already have "
+                                    f"'{c.title}' at this time. Pick a different slot."))
 
         old = {"start_time": str(event.start_time), "end_time": str(event.end_time)}
 
@@ -977,6 +1002,7 @@ def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occur
         if data.end_time:        event.end_time      = data.end_time
         if data.title:           event.title         = data.title
         if data.description is not None: event.description = data.description
+        if data.color is not None:       event.color       = data.color or None
 
         for booking in event.bookings:
             if booking.status not in (BookingStatus.CANCELLED, BookingStatus.REJECTED):
@@ -1166,6 +1192,7 @@ def _get_event_detail(self, event_id: str, actor: 'User') -> dict:
         "organizer_id": event.organizer_id,
         "organizer_name": organizer.full_name if organizer else "Unknown",
         "is_mine":      event.organizer_id == actor.id,
+        "color":        event.color,
         "bookings":     bookings,
     }
 
@@ -1236,6 +1263,7 @@ def _get_calendar_events(self, actor, start, end):
             "organizer_id":     e.organizer_id,
             "description":      e.description,
             "is_public":        e.is_public,
+            "color":            e.color,
             "is_recurring":     False,
             "is_exception":     False,
         })
@@ -1330,6 +1358,7 @@ def _get_calendar_events(self, actor, start, end):
                     "organizer_id":     root_event.organizer_id,
                     "description":      exception.description,
                     "is_public":        root_event.is_public,
+                    "color":            exception.color or root_event.color,
                     "is_recurring":     True,
                     "is_exception":     True,
                     "original_time":    occ_start,
@@ -1352,6 +1381,7 @@ def _get_calendar_events(self, actor, start, end):
                     "organizer_id":     root_event.organizer_id,
                     "description":      root_event.description,
                     "is_public":        root_event.is_public,
+                    "color":            root_event.color,
                     "is_recurring":     True,
                     "is_exception":     False,
                     "rrule":            rule.rrule,

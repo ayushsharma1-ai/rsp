@@ -113,6 +113,7 @@ def create_recurring_event(
         actor=current_user,
         is_public=data.is_public,
         notes=data.notes,
+        group_ids=data.group_ids,
     )
 
 @events_router.delete("/{event_id}/series")

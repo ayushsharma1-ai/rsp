@@ -8,8 +8,9 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import Base, engine
 from app.core.limiter import limiter          # ← from core, not main
 from app.modules import models                # noqa
-from app.api.v1.routes import auth, resources, bookings, users, feedback
+from app.api.v1.routes import auth, resources, bookings, users, feedback, availability, groups, clash, release
 from app.modules.notifications.service import register_handlers
+from app.modules.email.service import register_email_handlers
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 register_handlers()
+register_email_handlers()
 
 app = FastAPI(
     title="Resource Scheduling Platform",
@@ -49,6 +51,10 @@ app.include_router(resources.router, prefix="/api/v1")
 app.include_router(bookings.router,  prefix="/api/v1")
 app.include_router(users.router,     prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
+app.include_router(availability.router, prefix="/api/v1")
+app.include_router(groups.router,       prefix="/api/v1")
+app.include_router(clash.router,        prefix="/api/v1")
+app.include_router(release.router,      prefix="/api/v1")
 
 @app.get("/health")
 def health():

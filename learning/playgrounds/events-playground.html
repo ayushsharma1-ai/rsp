@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Event Bubbling & Capturing Playground</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; color: #1a1a1a; max-width: 820px; }
+  h1 { font-size: 1.4rem; }
+  p  { line-height: 1.5; }
+
+  /* the three nested boxes — colors + padding make the nesting obvious */
+  .box { padding: 22px; border-radius: 10px; border: 2px solid rgba(0,0,0,.25); margin-top: 10px; font-weight: 600; }
+  #grandparent { background: #dbeafe; }   /* light blue  */
+  #parent      { background: #bfdbfe; }    /* medium blue */
+  #child       { background: #2563eb; color: #fff; border: none; font-size: 1rem; cursor: pointer; }
+  #child:hover { background: #1d4ed8; }
+
+  .controls { margin: 18px 0; display: flex; flex-direction: column; gap: 8px; }
+  .controls label { font-size: .95rem; cursor: pointer; }
+
+  #log {
+    background: #0f172a; color: #e2e8f0; font-family: ui-monospace, Consolas, monospace;
+    font-size: .9rem; padding: 12px 14px; border-radius: 8px; height: 240px;
+    overflow-y: auto; white-space: pre;
+  }
+  .logline { padding: 1px 0; }
+  .divider { color: #64748b; }
+  button.clear { font-size: .8rem; margin-left: 8px; cursor: pointer; }
+
+  .try { background: #fef9c3; border: 1px solid #fde047; border-radius: 8px; padding: 12px 16px; margin-top: 20px; }
+  .try li { margin: 4px 0; line-height: 1.5; }
+  code { background: #00000012; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+  <h1>🧪 Event Bubbling &amp; Capturing Playground</h1>
+  <p>
+    Three boxes are <b>nested</b>: a <b>button</b> inside a <b>parent div</b> inside a
+    <b>grandparent div</b>. Each one has a click listener that writes to the log below.
+    <br><b>Click the blue button</b> and watch the order. Then flip the checkboxes. Then
+    <b>edit this file</b> (see "Things to try") and refresh.
+  </p>
+
+  <!-- ── the nested structure ──────────────────────────────── -->
+  <div id="grandparent" class="box">
+    grandparent (div)
+    <div id="parent" class="box">
+      parent (div)
+      <button id="child" class="box">child (button) — click me</button>
+    </div>
+  </div>
+
+  <!-- ── controls ──────────────────────────────────────────── -->
+  <div class="controls">
+    <label><input type="checkbox" id="stopBox"> Call <code>stopPropagation()</code> at the button</label>
+    <label><input type="checkbox" id="captureBox"> Also show the <b>capturing</b> (downward) phase</label>
+  </div>
+
+  <h3 style="margin-bottom:6px">Log <button class="clear" onclick="clearLog()">clear</button></h3>
+  <div id="log"></div>
+
+  <div class="try">
+    <b>🔍 Things to try (investigate!):</b>
+    <ol>
+      <li>Click the <b>button</b>, then the <b>parent</b> area, then the <b>grandparent</b> area. Notice the sequence changes with <i>where you clicked</i>.</li>
+      <li>Tick <b>“show capturing”</b> and click the button — now you see the full round trip: 🔻 down, then 🔵 up.</li>
+      <li>Tick <b>“stopPropagation”</b> and click the button — the parents never fire. Untick it and compare.</li>
+      <li><b>Edit the code below</b> (in this file): move the <code>stopPropagation()</code> from the child to the <b>parent</b> and see what changes.</li>
+      <li><b>Edit:</b> change a listener's third argument from <code>false</code> to <code>true</code> to make it a capturing listener permanently.</li>
+      <li><b>Edit:</b> add a 4th nested box of your own and wire it up with <code>wire('myid', 'my box')</code>.</li>
+    </ol>
+  </div>
+
+<script>
+  // ── tiny helper to print to the on-page log ──────────────────
+  const logEl     = document.getElementById('log')
+  const stopBox   = document.getElementById('stopBox')
+  const captureBox= document.getElementById('captureBox')
+
+  function write(msg, cls) {
+    const line = document.createElement('div')
+    line.className = 'logline' + (cls ? ' ' + cls : '')
+    line.textContent = msg
+    logEl.appendChild(line)
+    logEl.scrollTop = logEl.scrollHeight   // keep newest visible
+  }
+  function clearLog() { logEl.innerHTML = '' }
+
+  // ── print a divider at the very start of each click ──────────
+  // Registered on `document` in the CAPTURE phase, so it fires FIRST of all.
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#grandparent')) write('———————— you clicked ————————', 'divider')
+  }, true)
+
+  // ── wire ONE element with a capture listener AND a bubble listener ──
+  function wire(id, name) {
+    const el = document.getElementById(id)
+
+    // CAPTURING listener  →  3rd argument is TRUE  →  fires on the way DOWN
+    el.addEventListener('click', (e) => {
+      if (captureBox.checked) write('🔻 capture → ' + name)
+    }, true)
+
+    // BUBBLING listener  →  3rd argument omitted (false)  →  fires on the way UP
+    el.addEventListener('click', (e) => {
+      const isTarget = (id === 'child')
+      write('🔵 bubble  → ' + name + (isTarget ? '   (★ the TARGET)' : ''))
+
+      // the whole point of the demo:
+      if (isTarget && stopBox.checked) {
+        e.stopPropagation()
+        write('   ⛔ stopPropagation() — the click stops here; parents will NOT fire')
+      }
+    }, false)
+  }
+
+  // wire up the three boxes
+  wire('grandparent', 'grandparent (div)')
+  wire('parent',      'parent (div)')
+  wire('child',       'child (button)')
+</script>
+</body>
+</html>
