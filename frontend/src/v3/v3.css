@@ -6,6 +6,7 @@
   --brand: #5b6ef5;
   --brand-press: #4a5be0;
   --radius: 16px;
+  color-scheme: dark;          /* native selects / date pickers render dark */
   /* dark — tuned for readable contrast (text ≥ 7:1, muted ≥ 4.5:1) */
   --bg: #0c0e15;
   --surface: #171b27;
@@ -28,6 +29,7 @@
   --st-cancelled: #9aa6ba;
 }
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #f6f7fb;
   --surface: #ffffff;
   --surface-2: #eef1f7;
@@ -53,7 +55,7 @@ body {
   -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
 }
 h1, h2, h3, .v-h { font-family: 'Syne', 'DM Sans', sans-serif; }
-button { font: inherit; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
 .m-muted { color: var(--text-2); }
 .m-error { color: var(--danger); font-size: 0.85rem; margin: 0; }
 

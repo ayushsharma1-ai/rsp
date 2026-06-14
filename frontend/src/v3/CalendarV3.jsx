@@ -145,7 +145,7 @@ export function CalendarV3() {
 
       {view === 'month' && <MonthView cursor={cursor} today={today} events={visible} eventColor={eventColor} onPick={goDay} />}
       {view === 'week' && <WeekView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onPickDay={goDay} onEvent={openDetail} onPrev={stepBack} onNext={stepFwd} />}
-      {view === 'day' && <DayView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onBack={backFromDay}
+      {view === 'day' && <DayView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onBack={backFromDay} creating={!!create}
         onEvent={openDetail} onCreate={(start, end) => setCreate({ date: format(cursor, 'yyyy-MM-dd'), start, end })} />}
 
       <button className="v-fab" aria-label="New event" onClick={() => { haptic(); if (view !== 'day') goDay(cursor); else setCreate({ date: format(cursor, 'yyyy-MM-dd'), start: '09:00', end: '10:00' }) }}><Plus size={24} /></button>
@@ -261,13 +261,17 @@ function WeekView({ cursor, today, events, eventColor, loading, onPickDay, onEve
   )
 }
 
-function DayView({ cursor, today, events, eventColor, loading, onBack, onEvent, onCreate }) {
+function DayView({ cursor, today, events, eventColor, loading, onBack, creating, onEvent, onCreate }) {
   const hours = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i)
   const dayEvents = events.filter(e => isSameDay(parseISO(e.start), cursor))
   const isToday = isSameDay(cursor, today)
   const gridRef = useRef(null)
   const dragHandle = useRef(null)
   const [box, setBox] = useState(null)   // {start, end} in minutes
+
+  // Once the create sheet closes (event created OR cancelled), drop the
+  // selection box so it doesn't linger on top of the new event.
+  useEffect(() => { if (!creating) setBox(null) }, [creating])
 
   const yToMin = (clientY) => {
     // a queued move event can fire after unmount, when gridRef is already null
