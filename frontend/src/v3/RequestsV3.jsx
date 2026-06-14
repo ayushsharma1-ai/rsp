@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import ReactDOM from 'react-dom'
+import { format, startOfDay, endOfDay, addDays, parseISO } from 'date-fns'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import api from '../lib/api'
 import { ListSkeleton, Empty, Btn, useSnack } from '../mobile/ui'
-import { TIME_SLOTS, toISO, fdate } from '../mobile/lib'
+import { toISO, fdate } from '../mobile/lib'
 import { useAutoRefresh } from './useAutoRefresh'
-import SheetV3 from './SheetV3'
+import DayGrid from './DayGrid'
 
 const STATUS_LABEL = {
   requested: 'Pending', accepted_released: 'Released ✓', accepted_moved: 'Moved ✓',
@@ -15,7 +18,7 @@ export function RequestsV3() {
   const [incoming, setIncoming] = useState(null)
   const [outgoing, setOutgoing] = useState(null)
   const [tab, setTab] = useState('incoming')
-  const [shiftFor, setShiftFor] = useState(null)
+  const [moveReq, setMoveReq] = useState(null)   // request being accepted by moving my event
 
   const load = useCallback(() => {
     api.get('/release-requests/incoming').then(r => setIncoming(r.data)).catch(() => setIncoming([]))
@@ -26,8 +29,8 @@ export function RequestsV3() {
 
   const act = async (id, action) => { try { await api.post(`/release-requests/${id}/${action}`); snack('Done'); load() } catch { snack('Failed') } }
   const accept = async (id, body) => {
-    try { await api.post(`/release-requests/${id}/accept`, body); setShiftFor(null); snack('Accepted'); load() }
-    catch (e) { snack(e.response?.data?.detail || 'That time may be busy'); throw e }
+    try { await api.post(`/release-requests/${id}/accept`, body); setMoveReq(null); snack('Accepted'); load() }
+    catch (e) { throw e }   // surfaced inline by the caller (cancel button or move picker)
   }
 
   const list = tab === 'incoming' ? incoming : outgoing
@@ -54,9 +57,9 @@ export function RequestsV3() {
                     {req.message && <div className="m-muted" style={{ fontSize: '0.84rem' }}>“{req.message}”</div>}
                     {req.status === 'requested' ? (
                       <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-                        <Btn variant="primary" full onClick={() => accept(req.id, { mode: 'cancel' }).catch(() => {})}>Accept & cancel mine</Btn>
+                        <Btn variant="primary" full onClick={() => { if (window.confirm('Accept and cancel your event in this slot?')) accept(req.id, { mode: 'cancel' }).catch(() => snack('Failed')) }}>Accept & cancel mine</Btn>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <Btn full onClick={() => setShiftFor(req)}>Accept & move</Btn>
+                          <Btn full onClick={() => setMoveReq(req)}>Accept & move</Btn>
                           <Btn full variant="ghost" onClick={() => act(req.id, 'decline')}>Decline</Btn>
                         </div>
                       </div>
@@ -75,51 +78,59 @@ export function RequestsV3() {
             ))}
           </div>}
 
-      <ShiftSheet req={shiftFor} onClose={() => setShiftFor(null)} onConfirm={(body) => accept(shiftFor.id, body)} />
+      {moveReq && <MoveDayPicker req={moveReq} onClose={() => setMoveReq(null)} onConfirm={(body) => accept(moveReq.id, body)} />}
     </div>
   )
 }
 
-function ShiftSheet({ req, onClose, onConfirm }) {
-  const [date, setDate] = useState('')
-  const [start, setStart] = useState('09:00')
-  const [end, setEnd] = useState('10:00')
-  const [loading, setLoading] = useState(false)
+// Full-screen day-calendar picker — same grid as creating an event, but here you
+// pick a free slot to MOVE your event into. Shows that day's events for context.
+function MoveDayPicker({ req, onClose, onConfirm }) {
+  const [day, setDay] = useState(() => startOfDay(parseISO(req.start_time)))
+  const [events, setEvents] = useState(null)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    if (req) { setDate(new Date().toISOString().slice(0, 10)); setStart('09:00'); setEnd('10:00'); setError('') }
-  }, [req])
-  if (!req) return null
+  const load = useCallback(() => {
+    setEvents(null)
+    api.get('/events/calendar', { params: { start: startOfDay(day).toISOString(), end: endOfDay(day).toISOString() } })
+      .then(r => setEvents(r.data)).catch(() => setEvents([]))
+  }, [day])
+  useEffect(() => { load() }, [load])
 
-  const confirm = async () => {
-    if (end <= start) { setError('End must be after start.'); return }
-    setLoading(true); setError('')
-    try { await onConfirm({ mode: 'shift', new_start: toISO(date, start), new_end: toISO(date, end) }) }
-    catch (e) { setError(e.response?.data?.detail || 'That new time may be busy.') }
-    finally { setLoading(false) }
+  const submit = async (s, e) => {
+    if (busy) return
+    setError(''); setBusy(true)
+    const dayStr = format(day, 'yyyy-MM-dd')
+    try { await onConfirm({ mode: 'shift', new_start: toISO(dayStr, s), new_end: toISO(dayStr, e) }) }
+    catch (err) { setError(err.response?.data?.detail || 'That slot is busy — pick another.') }
+    finally { setBusy(false) }
   }
-  const endSlots = TIME_SLOTS.filter(s => s.value > start)
 
-  return (
-    <SheetV3 open={!!req} onClose={onClose} title="Move your event">
-      <p className="m-muted" style={{ marginTop: 0, fontSize: '0.86rem' }}>
-        Pick a new time for your event. The original slot then goes to <strong>{req.requester_name}</strong>.
-      </p>
-      <div style={{ display: 'grid', gap: 12 }}>
-        <input className="m-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select className="m-input" value={start} onChange={e => setStart(e.target.value)}>
-            {TIME_SLOTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-          <span style={{ color: 'var(--text-2)' }}>→</span>
-          <select className="m-input" value={end} onChange={e => setEnd(e.target.value)}>
-            {endSlots.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+  return ReactDOM.createPortal(
+    <div className="v-moveoverlay">
+      <div className="v-moveoverlay__head">
+        <button className="v-iconbtn" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+          <div style={{ fontWeight: 700 }}>Move your event</div>
+          <div className="m-muted" style={{ fontSize: '0.76rem' }}>Original slot goes to {req.requester_name}</div>
         </div>
-        {error && <p className="m-error">{error}</p>}
-        <Btn variant="primary" full loading={loading} onClick={confirm}>Move & release</Btn>
+        <div style={{ width: 40, flex: '0 0 40px' }} />
       </div>
-    </SheetV3>
+
+      <div className="v-moveoverlay__nav">
+        <button className="v-iconbtn" onClick={() => setDay(d => addDays(d, -1))} aria-label="Previous day"><ChevronLeft size={18} /></button>
+        <span style={{ fontWeight: 700 }}>{format(day, 'EEE, MMM d')}</span>
+        <button className="v-iconbtn" onClick={() => setDay(d => addDays(d, 1))} aria-label="Next day"><ChevronRight size={18} /></button>
+      </div>
+
+      {error && <p className="m-error" style={{ padding: '0 16px 4px' }}>{error}</p>}
+
+      <div className="v-moveoverlay__body">
+        <DayGrid cursor={day} today={new Date()} events={events || []}
+          eventColor={(e) => e.color || '#5b6ef5'} confirmLabel="Move here" onConfirm={submit} />
+      </div>
+    </div>,
+    document.body,
   )
 }

@@ -4,7 +4,7 @@ import {
   format, startOfMonth, startOfWeek, addMonths, addWeeks, addDays,
   startOfDay, endOfDay, isSameDay, isSameMonth, parseISO,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import api from '../lib/api'
 import { useAuthStore } from '../store/authStore'
 import { Btn, DetailRow, useSnack } from '../mobile/ui'
@@ -14,12 +14,10 @@ import { VENUES, EVENT_COLORS, venueColorForName, readableOn } from './config'
 import { useAutoRefresh } from './useAutoRefresh'
 import CreateEventV3 from './CreateEventV3'
 import SheetV3 from './SheetV3'
+import DayGrid from './DayGrid'
+import { DAY_START, DAY_END, WK_PX, evMins } from './dayConsts'
 
-const DAY_START = 7, DAY_END = 22
-const DAY_PX = 56, WK_PX = 44
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const hhmm = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
-const evMins = (iso) => { const d = parseISO(iso); return d.getHours() * 60 + d.getMinutes() }
 
 const venueKeyForName = (name) => {
   if (!name) return 'online'
@@ -28,33 +26,6 @@ const venueKeyForName = (name) => {
   return v ? v.key : 'other'
 }
 const colorByVenueKey = (key) => (VENUES.find(v => v.key === key)?.color) || '#64748b'
-
-// Lay overlapping day-view events into side-by-side columns so they don't
-// stack on top of each other. Returns [{ e, col, cols }].
-function layoutOverlaps(evts) {
-  const items = evts
-    .map(e => ({ e, s: evMins(e.start), en: Math.max(evMins(e.end), evMins(e.start) + 20) }))
-    .sort((a, b) => a.s - b.s || a.en - b.en)
-  const out = []
-  let cluster = [], clusterEnd = -1
-  const flush = () => {
-    const colEnds = []
-    cluster.forEach(it => {
-      let c = 0
-      for (; c < colEnds.length; c++) if (it.s >= colEnds[c]) break
-      it.col = c; colEnds[c] = it.en
-    })
-    const cols = colEnds.length
-    cluster.forEach(it => out.push({ e: it.e, col: it.col, cols }))
-    cluster = []
-  }
-  items.forEach(it => {
-    if (cluster.length && it.s >= clusterEnd) { flush(); clusterEnd = -1 }
-    cluster.push(it); clusterEnd = Math.max(clusterEnd, it.en)
-  })
-  flush()
-  return out
-}
 
 export function CalendarV3() {
   const { user } = useAuthStore()
@@ -292,66 +263,7 @@ function WeekView({ cursor, today, events, eventColor, loading, onPickDay, onEve
 }
 
 function DayView({ cursor, today, events, eventColor, loading, onBack, creating, onEvent, onCreate }) {
-  const hours = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i)
-  const dayEvents = events.filter(e => isSameDay(parseISO(e.start), cursor))
   const isToday = isSameDay(cursor, today)
-  const gridRef = useRef(null)
-  const dragHandle = useRef(null)
-  const [box, setBox] = useState(null)   // {start, end} in minutes
-
-  // Once the create sheet closes (event created OR cancelled), drop the
-  // selection box so it doesn't linger on top of the new event.
-  useEffect(() => { if (!creating) setBox(null) }, [creating])
-
-  const yToMin = (clientY) => {
-    // a queued move event can fire after unmount, when gridRef is already null
-    const rect = gridRef.current?.getBoundingClientRect()
-    if (!rect) return DAY_START * 60
-    let m = DAY_START * 60 + Math.round(((clientY - rect.top) / DAY_PX) * 60 / 15) * 15
-    return Math.max(DAY_START * 60, Math.min(DAY_END * 60, m))
-  }
-  const tapGrid = (e) => {
-    if (dragHandle.current) return
-    const start = Math.max(DAY_START * 60, Math.min((DAY_END - 1) * 60, yToMin(e.clientY) - 0))
-    setBox({ start, end: Math.min(DAY_END * 60, start + 60) })
-    haptic()
-  }
-  useEffect(() => {
-    const move = (ev) => {
-      if (!dragHandle.current) return
-      const cy = ev.touches ? ev.touches[0].clientY : ev.clientY
-      const m = yToMin(cy)
-      setBox(b => {
-        if (!b) return b
-        if (dragHandle.current === 'top') return { ...b, start: Math.min(m, b.end - 15) }
-        return { ...b, end: Math.max(m, b.start + 15) }
-      })
-      ev.preventDefault()
-    }
-    const up = () => { dragHandle.current = null }
-    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
-    window.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', up)
-    return () => {
-      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
-      window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up)
-    }
-  }, [])
-
-  // clash-on-select: existing events overlapping the selected box
-  const overlapping = box ? dayEvents.filter(e => evMins(e.start) < box.end && evMins(e.end) > box.start && e.status !== 'cancelled') : []
-  const laidEvents = layoutOverlaps(dayEvents)   // side-by-side columns for overlaps
-  const now = new Date()
-  const nowTop = ((now.getHours() - DAY_START) + now.getMinutes() / 60) * DAY_PX
-
-  // On opening a day, scroll the page to the current time (today) or to ~8am,
-  // instead of always sitting at 7am up top.
-  useEffect(() => {
-    const sc = gridRef.current?.closest('.v-content')
-    if (!sc) return
-    const hour = isToday ? new Date().getHours() : 8
-    sc.scrollTo({ top: Math.max(0, (hour - DAY_START - 0.5) * DAY_PX), behavior: 'auto' })
-  }, [cursor]) // eslint-disable-line
-
   return (
     <div>
       <div className="v-dayhead">
@@ -362,64 +274,9 @@ function DayView({ cursor, today, events, eventColor, loading, onBack, creating,
         <span style={{ fontWeight: 600 }}>{format(cursor, 'EEEE')}</span>
         {loading && <span className="m-spin" style={{ marginLeft: 'auto' }} />}
       </div>
-
-      <div className="v-grid" ref={gridRef} style={{ height: (DAY_END - DAY_START) * DAY_PX }}>
-        {hours.map(h => <div key={h} className="v-hour" style={{ height: DAY_PX }}><span className="v-hour__label">{format(new Date().setHours(h, 0), 'h a')}</span></div>)}
-        <div className="v-grid__col" onClick={tapGrid}>
-          {laidEvents.map(({ e, col, cols }) => {
-            const s = parseISO(e.start), en = parseISO(e.end)
-            const top = ((s.getHours() - DAY_START) + s.getMinutes() / 60) * DAY_PX
-            const h = Math.max(24, ((en - s) / 3600000) * DAY_PX)
-            const cancelled = e.status === 'cancelled'
-            const bg = eventColor(e)
-            return (
-              <div key={e.id + e.start} className="v-event"
-                style={{
-                  top, height: h,
-                  left: `calc(${(col / cols) * 100}% + 2px)`,
-                  width: `calc(${100 / cols}% - 4px)`,
-                  right: 'auto',
-                  background: cancelled ? 'var(--surface-2)' : bg,
-                  color: cancelled ? 'var(--text-3)' : readableOn(bg),
-                  opacity: cancelled ? 0.7 : 1,
-                }}
-                onClick={(ev) => { ev.stopPropagation(); onEvent(e) }}>
-                <div className="v-event__t">{e.is_recurring && !e.is_exception && '↺ '}{e.title}</div>
-                {h > 34 && cols < 3 && <div className="v-event__time">{format(s, 'HH:mm')}–{format(en, 'HH:mm')}</div>}
-              </div>
-            )
-          })}
-
-          {box && (
-            <div className="v-selbox" style={{ top: ((box.start - DAY_START * 60) / 60) * DAY_PX, height: ((box.end - box.start) / 60) * DAY_PX }}
-              onClick={(e) => e.stopPropagation()}>
-              <div className="v-selbox__handle v-selbox__handle--top" onMouseDown={() => { dragHandle.current = 'top' }} onTouchStart={() => { dragHandle.current = 'top' }} />
-              <div className="v-selbox__label">{hhmm(box.start)} – {hhmm(box.end)}</div>
-              <div className="v-selbox__handle v-selbox__handle--bot" onMouseDown={() => { dragHandle.current = 'bot' }} onTouchStart={() => { dragHandle.current = 'bot' }} />
-            </div>
-          )}
-
-          {isToday && nowTop >= 0 && nowTop <= (DAY_END - DAY_START) * DAY_PX && <div className="v-nowline" style={{ top: nowTop, left: 0 }} />}
-        </div>
-      </div>
-
-      {!box && <p className="m-muted" style={{ textAlign: 'center', marginTop: 12, fontSize: '0.85rem' }}>Tap a time to start a new event.</p>}
-
-      {/* selection action bar with clash-on-select prompt */}
-      {box && (
-        <div className="v-selbar">
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700 }}>{hhmm(box.start)} – {hhmm(box.end)}</div>
-            {overlapping.length > 0
-              ? <div style={{ color: 'var(--warn)', fontSize: '0.8rem' }}>⚠ Clashes with {overlapping.map(e => e.title).join(', ')}</div>
-              : <div className="m-muted" style={{ fontSize: '0.8rem' }}>Slot is free · drag handles to adjust</div>}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="v-iconbtn" onClick={() => setBox(null)} aria-label="Cancel"><X size={18} /></button>
-            <Btn variant="primary" onClick={() => onCreate(hhmm(box.start), hhmm(box.end))}>Add event</Btn>
-          </div>
-        </div>
-      )}
+      <DayGrid cursor={cursor} today={today} events={events} eventColor={eventColor}
+        confirmLabel="Add event" sheetOpen={creating} onEventTap={onEvent}
+        onConfirm={(s, e) => onCreate(s, e)} />
     </div>
   )
 }
