@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
+import ReactDOM from 'react-dom'
 
 // Bottom sheet that collapses when you drag it down (slide finger back).
-// Drag starts from the grab-handle / header zone so the scrollable body still
-// scrolls normally. Release past the threshold closes; otherwise it snaps back.
+// Rendered through a portal to <body> so it always sits ABOVE the fixed tab bar
+// on iOS Safari (where the in-tree version got painted under it). Drag starts
+// from the grab-handle / header zone so the scrollable body still scrolls.
 export default function SheetV3({ open, onClose, title, children }) {
   const [drag, setDrag] = useState(0)
   const startY = useRef(null)
@@ -11,9 +13,15 @@ export default function SheetV3({ open, onClose, title, children }) {
 
   useEffect(() => {
     if (!open) { setDrag(0); return }
+    // lock background scroll while the sheet is open (stops iOS rubber-banding)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     const onKey = (e) => e.key === 'Escape' && onClose && onClose()
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
   }, [open, onClose])
 
   if (!open) return null
@@ -36,7 +44,7 @@ export default function SheetV3({ open, onClose, title, children }) {
 
   const backdropOpacity = Math.max(0, 0.5 - drag / 600)
 
-  return (
+  return ReactDOM.createPortal(
     <>
       <div className="m-sheet-backdrop" style={{ background: `rgba(0,0,0,${backdropOpacity})`, animation: drag ? 'none' : undefined }} onClick={onClose} />
       <div className="m-sheet" ref={ref} role="dialog" aria-modal="true"
@@ -49,6 +57,7 @@ export default function SheetV3({ open, onClose, title, children }) {
         </div>
         {children}
       </div>
-    </>
+    </>,
+    document.body,
   )
 }

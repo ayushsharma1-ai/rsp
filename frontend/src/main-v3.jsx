@@ -12,8 +12,8 @@ import { SettingsV3 } from './v3/SettingsV3'
 import { BookingsV3 } from './v3/BookingsV3'
 import { GroupsV3 } from './v3/GroupsV3'
 import { UsersV3 } from './v3/UsersV3'
-// Slot Requests + Feedback are unchanged from v2 — reused as-is.
-import { RequestsScreen } from './mobile/pages/RequestsScreen'
+import { RequestsV3 } from './v3/RequestsV3'
+// Feedback is unchanged from v2 (no bottom sheet) — reused as-is.
 import { FeedbackScreen } from './mobile/pages/FeedbackScreen'
 
 function RequireAuth({ children }) {
@@ -34,7 +34,7 @@ function AppV3() {
           <Route path="bookings" element={<BookingsV3 />} />
           <Route path="groups" element={<GroupsV3 />} />
           <Route path="users" element={<UsersV3 />} />
-          <Route path="requests" element={<RequestsScreen />} />
+          <Route path="requests" element={<RequestsV3 />} />
           <Route path="feedback" element={<FeedbackScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

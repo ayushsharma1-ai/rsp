@@ -29,6 +29,33 @@ const venueKeyForName = (name) => {
 }
 const colorByVenueKey = (key) => (VENUES.find(v => v.key === key)?.color) || '#64748b'
 
+// Lay overlapping day-view events into side-by-side columns so they don't
+// stack on top of each other. Returns [{ e, col, cols }].
+function layoutOverlaps(evts) {
+  const items = evts
+    .map(e => ({ e, s: evMins(e.start), en: Math.max(evMins(e.end), evMins(e.start) + 20) }))
+    .sort((a, b) => a.s - b.s || a.en - b.en)
+  const out = []
+  let cluster = [], clusterEnd = -1
+  const flush = () => {
+    const colEnds = []
+    cluster.forEach(it => {
+      let c = 0
+      for (; c < colEnds.length; c++) if (it.s >= colEnds[c]) break
+      it.col = c; colEnds[c] = it.en
+    })
+    const cols = colEnds.length
+    cluster.forEach(it => out.push({ e: it.e, col: it.col, cols }))
+    cluster = []
+  }
+  items.forEach(it => {
+    if (cluster.length && it.s >= clusterEnd) { flush(); clusterEnd = -1 }
+    cluster.push(it); clusterEnd = Math.max(clusterEnd, it.en)
+  })
+  flush()
+  return out
+}
+
 export function CalendarV3() {
   const { user } = useAuthStore()
   const snack = useSnack()
@@ -98,10 +125,13 @@ export function CalendarV3() {
     } catch { setSel({ ...e, blockStart: e.start, blockEnd: e.end }) }
   }
   const cancelEvt = async () => {
+    const msg = sel.is_recurring ? 'Cancel just this occurrence?' : `Cancel “${sel.title}”?`
+    if (!window.confirm(msg)) return
     try { await api.post(`/events/${sel.id}/cancel`, sel.is_recurring ? { occurrence_date: sel.blockStart } : {}); snack('Cancelled'); setSel(null); load() }
     catch (e) { snack(e.response?.data?.detail || 'Failed') }
   }
   const deleteSeries = async () => {
+    if (!window.confirm('Delete the ENTIRE recurring series? Every occurrence will be removed. This cannot be undone.')) return
     try { await api.delete(`/events/${sel.id}/series`); snack('Series deleted'); setSel(null); load() }
     catch (e) { snack(e.response?.data?.detail || 'Failed') }
   }
@@ -309,8 +339,18 @@ function DayView({ cursor, today, events, eventColor, loading, onBack, creating,
 
   // clash-on-select: existing events overlapping the selected box
   const overlapping = box ? dayEvents.filter(e => evMins(e.start) < box.end && evMins(e.end) > box.start && e.status !== 'cancelled') : []
+  const laidEvents = layoutOverlaps(dayEvents)   // side-by-side columns for overlaps
   const now = new Date()
   const nowTop = ((now.getHours() - DAY_START) + now.getMinutes() / 60) * DAY_PX
+
+  // On opening a day, scroll the page to the current time (today) or to ~8am,
+  // instead of always sitting at 7am up top.
+  useEffect(() => {
+    const sc = gridRef.current?.closest('.v-content')
+    if (!sc) return
+    const hour = isToday ? new Date().getHours() : 8
+    sc.scrollTo({ top: Math.max(0, (hour - DAY_START - 0.5) * DAY_PX), behavior: 'auto' })
+  }, [cursor]) // eslint-disable-line
 
   return (
     <div>
@@ -326,17 +366,26 @@ function DayView({ cursor, today, events, eventColor, loading, onBack, creating,
       <div className="v-grid" ref={gridRef} style={{ height: (DAY_END - DAY_START) * DAY_PX }}>
         {hours.map(h => <div key={h} className="v-hour" style={{ height: DAY_PX }}><span className="v-hour__label">{format(new Date().setHours(h, 0), 'h a')}</span></div>)}
         <div className="v-grid__col" onClick={tapGrid}>
-          {dayEvents.map(e => {
+          {laidEvents.map(({ e, col, cols }) => {
             const s = parseISO(e.start), en = parseISO(e.end)
             const top = ((s.getHours() - DAY_START) + s.getMinutes() / 60) * DAY_PX
             const h = Math.max(24, ((en - s) / 3600000) * DAY_PX)
             const cancelled = e.status === 'cancelled'
             const bg = eventColor(e)
             return (
-              <div key={e.id + e.start} className="v-event" style={{ top, height: h, background: cancelled ? 'var(--surface-2)' : bg, color: cancelled ? 'var(--text-3)' : readableOn(bg), opacity: cancelled ? 0.7 : 1 }}
+              <div key={e.id + e.start} className="v-event"
+                style={{
+                  top, height: h,
+                  left: `calc(${(col / cols) * 100}% + 2px)`,
+                  width: `calc(${100 / cols}% - 4px)`,
+                  right: 'auto',
+                  background: cancelled ? 'var(--surface-2)' : bg,
+                  color: cancelled ? 'var(--text-3)' : readableOn(bg),
+                  opacity: cancelled ? 0.7 : 1,
+                }}
                 onClick={(ev) => { ev.stopPropagation(); onEvent(e) }}>
                 <div className="v-event__t">{e.is_recurring && !e.is_exception && '↺ '}{e.title}</div>
-                {h > 34 && <div className="v-event__time">{format(s, 'HH:mm')}–{format(en, 'HH:mm')}</div>}
+                {h > 34 && cols < 3 && <div className="v-event__time">{format(s, 'HH:mm')}–{format(en, 'HH:mm')}</div>}
               </div>
             )
           })}

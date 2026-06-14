@@ -1,7 +1,9 @@
-import React from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, CalendarDays, Settings, ChevronLeft, Sun, Moon } from 'lucide-react'
 import { useTheme, haptic } from '../mobile/theme'
+import api from '../lib/api'
+import { useAutoRefresh } from './useAutoRefresh'
 
 // Tab bar: Notifications · Calendar (center, default) · Settings.
 const TAB_PATHS = ['/', '/notifications', '/settings']
@@ -17,6 +19,16 @@ export default function AppShellV3() {
   const navigate = useNavigate()
   const isTab = TAB_PATHS.includes(loc.pathname)
   const title = TITLES[loc.pathname] || 'RSP'
+
+  // unread-notification dot on the Activity tab
+  const [unread, setUnread] = useState(0)
+  const loadUnread = useCallback(() => {
+    api.get('/users/me/notifications')
+      .then(r => setUnread(r.data.filter(n => !n.is_read).length))
+      .catch(() => {})
+  }, [])
+  useEffect(() => { loadUnread() }, [loadUnread, loc.pathname]) // refresh when you change tabs
+  useAutoRefresh(loadUnread, 30000)
 
   return (
     <div className="v-app">
@@ -36,7 +48,11 @@ export default function AppShellV3() {
 
       <nav className="v-tabbar">
         <NavLink to="/notifications" onClick={haptic} className={({ isActive }) => `v-tab ${isActive ? 'v-tab--active' : ''}`}>
-          <Bell size={22} /><span>Activity</span>
+          <span style={{ position: 'relative', display: 'inline-flex' }}>
+            <Bell size={22} />
+            {unread > 0 && <span className="v-tab__dot" />}
+          </span>
+          <span>Activity</span>
         </NavLink>
         <NavLink to="/" end onClick={haptic} className={({ isActive }) => `v-tab v-tab--center ${isActive ? 'v-tab--active' : ''}`}>
           <span className="v-tab__badge"><CalendarDays size={26} /></span>

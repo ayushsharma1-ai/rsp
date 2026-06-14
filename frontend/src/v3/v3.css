@@ -48,6 +48,7 @@
   --st-cancelled: #475569;
 }
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }   /* no iOS rotate text-inflation */
 html, body { height: 100%; margin: 0; }
 body {
   font-family: 'DM Sans', system-ui, sans-serif;
@@ -56,6 +57,7 @@ body {
 }
 h1, h2, h3, .v-h { font-family: 'Syne', 'DM Sans', sans-serif; }
 button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+a { -webkit-tap-highlight-color: transparent; }
 .m-muted { color: var(--text-2); }
 .m-error { color: var(--danger); font-size: 0.85rem; margin: 0; }
 
@@ -103,13 +105,13 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .m-warn { background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.40); border-radius: 14px; padding: 12px 14px; font-size: 0.88rem; }
 .m-spin { width: 22px; height: 22px; border: 2.5px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: m-spin 0.7s linear infinite; display: inline-block; }
 .m-skel { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: m-shimmer 1.3s linear infinite; border-radius: 10px; }
-.m-sheet-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.5); animation: m-fade 0.2s ease; }
-.m-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 51; background: var(--surface); border-radius: 22px 22px 0 0; padding: 8px 16px calc(env(safe-area-inset-bottom) + 20px); max-height: 90dvh; overflow-y: auto; box-shadow: 0 -12px 40px rgba(0,0,0,0.35); animation: m-slideup 0.28s cubic-bezier(0.2,0.8,0.2,1); }
+.m-sheet-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.5); animation: m-fade 0.2s ease; }
+.m-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001; background: var(--surface); border-radius: 22px 22px 0 0; padding: 8px 16px calc(env(safe-area-inset-bottom) + 28px); max-height: 88vh; max-height: 88dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; box-shadow: 0 -12px 40px rgba(0,0,0,0.35); animation: m-slideup 0.28s cubic-bezier(0.2,0.8,0.2,1); }
 .m-sheet__handle { width: 40px; height: 5px; border-radius: 3px; background: var(--border); margin: 8px auto 14px; }
 .m-sheet__title { font-weight: 700; font-size: 1.2rem; margin: 0 0 12px; }
 .m-sheet__grab { touch-action: none; cursor: grab; user-select: none; }
 .m-sheet__grab:active { cursor: grabbing; }
-.m-snackbar { position: fixed; left: 16px; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 60; background: var(--text); color: var(--bg); padding: 13px 16px; border-radius: 13px; font-size: 0.9rem; font-weight: 500; animation: m-slideup 0.25s ease; }
+.m-snackbar { position: fixed; left: 16px; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 1002; background: var(--text); color: var(--bg); padding: 13px 16px; border-radius: 13px; font-size: 0.9rem; font-weight: 500; animation: m-slideup 0.25s ease; }
 
 @keyframes m-slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes m-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -117,7 +119,7 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 @keyframes m-spin { to { transform: rotate(360deg); } }
 
 /* ---- v3 app shell ---- */
-.v-app { min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
+.v-app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
 .v-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; background: var(--bar-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-bottom: 1px solid var(--border); }
 .v-topbar__title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.01em; }
 .v-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface-2); color: var(--text); cursor: pointer; transition: transform 0.08s; }
@@ -128,6 +130,7 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; min-height: 50px; border-radius: 12px; color: var(--text-3); text-decoration: none; font-size: 0.66rem; font-weight: 600; transition: color 0.15s, transform 0.08s; }
 .v-tab--active { color: var(--brand); }
 .v-tab:active { transform: scale(0.92); }
+.v-tab__dot { position: absolute; top: -3px; right: -5px; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--bar-bg); }
 /* centered calendar tab — raised pill */
 .v-tab--center { flex: 0 0 auto; }
 .v-tab--center .v-tab__badge { width: 56px; height: 56px; border-radius: 18px; background: var(--brand); color: #fff; display: grid; place-items: center; margin-top: -22px; box-shadow: 0 8px 22px rgba(91,110,245,0.45); }
@@ -168,7 +171,7 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-grid { position: relative; border-top: 1px solid var(--border); }
 .v-hour { position: relative; height: 56px; border-bottom: 1px solid var(--border); }
 .v-hour__label { position: absolute; left: 0; top: -8px; width: 48px; font-size: 0.68rem; color: var(--text-3); text-align: right; padding-right: 8px; }
-.v-grid__col { position: absolute; left: 56px; right: 0; top: 0; bottom: 0; }
+.v-grid__col { position: absolute; left: 56px; right: 0; top: 0; bottom: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .v-event { position: absolute; left: 2px; right: 4px; border-radius: 9px; padding: 4px 8px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
 .v-event__t { font-size: 0.76rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: inherit; }
 .v-event__time { font-size: 0.68rem; opacity: 0.85; color: inherit; }
