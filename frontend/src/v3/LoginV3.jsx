@@ -84,11 +84,11 @@ export default function LoginV3() {
           {isRegister ? 'Have an account? Sign in' : 'New here? Create an account'}
         </button>
 
-        {!isRegister && (
+        {/* {!isRegister && (
           <p className="m-muted" style={{ fontSize: '0.78rem', textAlign: 'center', margin: '2px 0 0' }}>
             Admin: admin@rsp.edu · admin123
           </p>
-        )}
+        )} */}
       </form>
     </div>
   )
