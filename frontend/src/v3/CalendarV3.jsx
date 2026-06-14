@@ -10,7 +10,7 @@ import { useAuthStore } from '../store/authStore'
 import { Btn, DetailRow, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
 import { haptic } from '../mobile/theme'
-import { VENUES, EVENT_COLORS, venueColorForName } from './config'
+import { VENUES, EVENT_COLORS, venueColorForName, readableOn } from './config'
 import { useAutoRefresh } from './useAutoRefresh'
 import CreateEventV3 from './CreateEventV3'
 import SheetV3 from './SheetV3'
@@ -242,8 +242,9 @@ function WeekView({ cursor, today, events, eventColor, loading, onPickDay, onEve
               {list.map(e => {
                 const top = ((evMins(e.start) - DAY_START * 60) / 60) * WK_PX
                 const h = Math.max(16, ((parseISO(e.end) - parseISO(e.start)) / 3600000) * WK_PX)
+                const bg = eventColor(e)
                 return (
-                  <div key={e.id + e.start} className="v-week__ev" style={{ top, height: h, background: eventColor(e) }}
+                  <div key={e.id + e.start} className="v-week__ev" style={{ top, height: h, background: bg, color: readableOn(bg) }}
                     onClick={(ev) => { ev.stopPropagation(); onEvent(e) }} title={e.title}>
                     <span className="v-week__ev-title">{e.title}</span>
                     {h > 30 && <span className="v-week__ev-time">{format(parseISO(e.start), 'HH:mm')}</span>}
@@ -326,8 +327,9 @@ function DayView({ cursor, today, events, eventColor, loading, onBack, onEvent, 
             const top = ((s.getHours() - DAY_START) + s.getMinutes() / 60) * DAY_PX
             const h = Math.max(24, ((en - s) / 3600000) * DAY_PX)
             const cancelled = e.status === 'cancelled'
+            const bg = eventColor(e)
             return (
-              <div key={e.id + e.start} className="v-event" style={{ top, height: h, background: cancelled ? 'var(--text-3)' : eventColor(e), opacity: cancelled ? 0.5 : 1 }}
+              <div key={e.id + e.start} className="v-event" style={{ top, height: h, background: cancelled ? 'var(--surface-2)' : bg, color: cancelled ? 'var(--text-3)' : readableOn(bg), opacity: cancelled ? 0.7 : 1 }}
                 onClick={(ev) => { ev.stopPropagation(); onEvent(e) }}>
                 <div className="v-event__t">{e.is_recurring && !e.is_exception && '↺ '}{e.title}</div>
                 {h > 34 && <div className="v-event__time">{format(s, 'HH:mm')}–{format(en, 'HH:mm')}</div>}

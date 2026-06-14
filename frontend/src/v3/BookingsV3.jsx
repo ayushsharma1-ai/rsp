@@ -7,16 +7,19 @@ import { TIME_SLOTS, toISO } from '../mobile/lib'
 import SheetV3 from './SheetV3'
 import { useAutoRefresh } from './useAutoRefresh'
 
-// Booking status → color (the "coloured booking filters" from the spec).
+// Booking status -> theme-aware accent (the "coloured booking filters" from the
+// spec). Colors live in v3.css as --st-* vars so they stay readable in both
+// light and dark; here we just reference the right CSS class / variable.
 const STATUS = [
-  { key: '', label: 'All', color: 'var(--brand)' },
-  { key: 'pending', label: 'Pending', color: '#d97706' },
-  { key: 'confirmed', label: 'Confirmed', color: '#16a34a' },
-  { key: 'approved', label: 'Approved', color: '#2563eb' },
-  { key: 'rejected', label: 'Rejected', color: '#dc2626' },
-  { key: 'cancelled', label: 'Cancelled', color: '#64748b' },
+  { key: '', label: 'All', cls: 'stat--all' },
+  { key: 'pending', label: 'Pending', cls: 'stat--pending' },
+  { key: 'confirmed', label: 'Confirmed', cls: 'stat--confirmed' },
+  { key: 'approved', label: 'Approved', cls: 'stat--approved' },
+  { key: 'rejected', label: 'Rejected', cls: 'stat--rejected' },
+  { key: 'cancelled', label: 'Cancelled', cls: 'stat--cancelled' },
 ]
-const colorOf = (s) => (STATUS.find(x => x.key === s)?.color) || 'var(--text-3)'
+const clsOf = (s) => STATUS.find(x => x.key === s)?.cls || 'stat--cancelled'
+const accentVar = (s) => `var(--st-${s || 'cancelled'})`
 const fmt = (s, f = 'MMM d · HH:mm') => { try { return format(new Date(s), f) } catch { return s } }
 const EDITABLE = ['pending', 'confirmed', 'approved']
 
@@ -45,27 +48,23 @@ export function BookingsV3() {
   return (
     <div>
       <div className="m-chips">
-        {STATUS.map(s => {
-          const on = filter === s.key
-          return (
-            <button key={s.key} className="m-chip" onClick={() => setFilter(s.key)}
-              style={on ? { background: s.color, borderColor: s.color, color: '#fff' } : { borderColor: s.color, color: s.color }}>
-              {s.label}
-            </button>
-          )
-        })}
+        {STATUS.map(s => (
+          <button key={s.key} className={`stat ${s.cls} ${filter === s.key ? 'is-on' : ''}`} onClick={() => setFilter(s.key)}>
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {items === null ? <ListSkeleton /> :
         items.length === 0 ? <Empty text="No bookings." /> :
           <div style={{ display: 'grid', gap: 10 }}>
             {items.map(b => (
-              <button key={b.id} className="m-card m-eventrow" style={{ textAlign: 'left', borderLeft: `3px solid ${colorOf(b.status)}` }} onClick={() => setSel(b)}>
+              <button key={b.id} className="m-card m-eventrow" style={{ textAlign: 'left', borderLeft: '3px solid', borderLeftColor: accentVar(b.status) }} onClick={() => setSel(b)}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.event_title || 'Booking'}</div>
                   <div className="m-muted" style={{ fontSize: '0.82rem' }}>{b.resource_name} · {fmt(b.start_time)}</div>
                 </div>
-                <span className="m-badge" style={{ color: colorOf(b.status) }}>{b.status}</span>
+                <span className={`statbadge ${clsOf(b.status)}`}>{b.status}</span>
               </button>
             ))}
           </div>}

@@ -18,6 +18,14 @@
   --ok: #4ade80;
   --warn: #fcd34d;
   --bar-bg: rgba(12,14,21,0.82);
+  --link: #8ea2ff;            /* brand, brightened for links on dark */
+  --on-accent: #0b0d15;       /* text sitting on a filled bright accent (dark mode) */
+  /* status accents — light/bright variants for the dark background */
+  --st-pending: #fbbf24;
+  --st-confirmed: #4ade80;
+  --st-approved: #93b4ff;
+  --st-rejected: #fca5a5;
+  --st-cancelled: #9aa6ba;
 }
 [data-theme="light"] {
   --bg: #f6f7fb;
@@ -28,6 +36,14 @@
   --text-2: #5b6373;
   --text-3: #98a1b3;
   --bar-bg: rgba(255,255,255,0.86);
+  --link: #4a5be0;
+  --on-accent: #ffffff;       /* text on a filled accent (light mode) */
+  /* status accents — darker variants for the light background */
+  --st-pending: #b45309;
+  --st-confirmed: #15803d;
+  --st-approved: #1d4ed8;
+  --st-rejected: #b91c1c;
+  --st-cancelled: #475569;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -69,7 +85,19 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .m-chips::-webkit-scrollbar { display: none; }
 .m-chip { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
 .m-chip--active { background: var(--brand); color: #fff; border-color: var(--brand); }
-.m-link { background: none; border: none; color: var(--brand); font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; font-size: 0.84rem; }
+.m-link { background: none; border: none; color: var(--link); font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; font-size: 0.84rem; }
+
+/* status chips + badges — readable accent text in BOTH themes.
+   Each variant just sets --accent; chip/badge styles read it. */
+.stat--all { --accent: var(--brand); }
+.stat--pending { --accent: var(--st-pending); }
+.stat--confirmed { --accent: var(--st-confirmed); }
+.stat--approved { --accent: var(--st-approved); }
+.stat--rejected { --accent: var(--st-rejected); }
+.stat--cancelled { --accent: var(--st-cancelled); }
+.stat { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: pointer; background: transparent; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.stat.is-on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.statbadge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: capitalize; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .m-warn { background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.40); border-radius: 14px; padding: 12px 14px; font-size: 0.88rem; }
 .m-spin { width: 22px; height: 22px; border: 2.5px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: m-spin 0.7s linear infinite; display: inline-block; }
 .m-skel { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: m-shimmer 1.3s linear infinite; border-radius: 10px; }
@@ -139,9 +167,9 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-hour { position: relative; height: 56px; border-bottom: 1px solid var(--border); }
 .v-hour__label { position: absolute; left: 0; top: -8px; width: 48px; font-size: 0.68rem; color: var(--text-3); text-align: right; padding-right: 8px; }
 .v-grid__col { position: absolute; left: 56px; right: 0; top: 0; bottom: 0; }
-.v-event { position: absolute; left: 2px; right: 4px; border-radius: 9px; padding: 4px 8px; color: #fff; overflow: hidden; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
-.v-event__t { font-size: 0.76rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v-event__time { font-size: 0.68rem; opacity: 0.9; }
+.v-event { position: absolute; left: 2px; right: 4px; border-radius: 9px; padding: 4px 8px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
+.v-event__t { font-size: 0.76rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: inherit; }
+.v-event__time { font-size: 0.68rem; opacity: 0.85; color: inherit; }
 .v-nowline { position: absolute; left: 56px; right: 0; height: 2px; background: var(--danger); z-index: 5; }
 .v-nowline::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
 
@@ -169,8 +197,8 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-week__col { position: relative; flex: 1; border-left: 1px solid var(--border); }
 .v-week__line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border); }
 .v-week__ev { position: absolute; left: 1px; right: 1px; border-radius: 4px; min-height: 12px; cursor: pointer; overflow: hidden; padding: 2px 3px; display: flex; flex-direction: column; }
-.v-week__ev-title { font-size: 0.58rem; font-weight: 700; line-height: 1.15; color: #fff; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
-.v-week__ev-time { font-size: 0.54rem; color: rgba(255,255,255,0.85); }
+.v-week__ev-title { font-size: 0.58rem; font-weight: 700; line-height: 1.15; color: inherit; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.v-week__ev-time { font-size: 0.54rem; color: inherit; opacity: 0.8; }
 
 /* ---- Notifications (flat list, hairline dividers — not boxes) ---- */
 .v-notif-group { margin: 14px 2px 4px; font-size: 0.72rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
