@@ -9,7 +9,7 @@ import {
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Trash2, Move } from 'lucide-react'
 
-const HOUR_START  = 7
+const HOUR_START  = 0
 const HOUR_END    = 24
 const HOURS       = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START)
 const CELL_HEIGHT = 60
@@ -52,9 +52,10 @@ export default function CalendarPage() {
 
   // Refs for drag/resize — not state because mouse handlers
   // need current values without stale closures
-  const dragging = useRef(null)
-  const resizing = useRef(null)
-  const gridRef  = useRef(null)
+  const dragging  = useRef(null)
+  const resizing  = useRef(null)
+  const gridRef   = useRef(null)
+  const scrollRef = useRef(null)
 
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 })
   const days    = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -87,6 +88,11 @@ export default function CalendarPage() {
   useEffect(() => { fetchEvents() }, [fetchEvents])
   useEffect(() => {
     api.get('/resources').then(r => setResources(r.data)).catch(() => {})
+  }, [])
+
+  // On first open, scroll the grid to working hours (~8 AM) instead of midnight
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = (8 - HOUR_START) * CELL_HEIGHT
   }, [])
 
   // ── Grid helpers ───────────────────────────────────────────
@@ -423,11 +429,11 @@ export default function CalendarPage() {
         </div>
 
         {/* Time grid */}
-        <div className="cal-scroll">
+        <div className="cal-scroll" ref={scrollRef}>
           <div className="cal-body-wrap">
-            <div className="cal-time-gutter-col">
+            <div className="cal-time-gutter-col" style={{ minHeight: (HOUR_END - HOUR_START) * CELL_HEIGHT }}>
               {HOURS.map(h => (
-                <div key={h} className="cal-time-label" style={{ height: CELL_HEIGHT }}>
+                <div key={h} className="cal-time-label" style={{ top: (h - HOUR_START) * CELL_HEIGHT }}>
                   {format(new Date().setHours(h, 0), 'h a')}
                 </div>
               ))}

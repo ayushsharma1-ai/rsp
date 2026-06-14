@@ -442,20 +442,24 @@
 .cal-body-wrap {
   display: flex;
   position: relative;
+  padding-top: 8px;
 }
 .cal-time-gutter-col {
   width: 52px;
   flex-shrink: 0;
+  position: relative;
   border-right: 1px solid var(--border);
   background: var(--bg3);
 }
 .cal-time-label {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 2px 6px 0 0;
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);   /* center the label on its hour line */
+  padding: 0 3px;
   font-size: 0.65rem;
+  line-height: 1;
   color: var(--text3);
+  background: var(--bg3);         /* opaque → the line never strikes through the text */
   box-sizing: border-box;
 }
 
@@ -463,7 +467,7 @@
 .cal-days-area {
   flex: 1;
   position: relative;
-  min-height: calc((21 - 7) * 56px); /* HOUR_END - HOUR_START * CELL_HEIGHT */
+  min-height: calc(24 * 60px); /* (HOUR_END - HOUR_START) * CELL_HEIGHT = 24h */
 }
 .cal-hour-line {
   position: absolute;

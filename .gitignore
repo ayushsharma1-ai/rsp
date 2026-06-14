@@ -9,4 +9,7 @@ node_modules/
 dist/
 
 # OS
-.DS_Store 
+.DS_Store
+
+# Personal study notes — kept local, not pushed
+learning/ 
