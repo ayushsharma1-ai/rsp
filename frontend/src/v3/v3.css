@@ -103,6 +103,24 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .stat.is-on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .statbadge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: capitalize; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .m-warn { background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.40); border-radius: 14px; padding: 12px 14px; font-size: 0.88rem; }
+
+/* scheduling-conflict card (create-event) */
+.v-clash { border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border)); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); border-radius: 14px; padding: 12px 14px; }
+.v-clash__head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; color: var(--text); }
+.v-clash__head svg { color: var(--warn); flex: 0 0 auto; }
+.v-clash__item { margin-top: 10px; }
+.v-clash__name { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.v-clash__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.v-clash__tag { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+.v-clash__tag--block { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.v-clash__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 9px 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; }
+.v-clash__room { font-size: 0.84rem; color: var(--text-2); min-width: 0; }
+.v-clash__room strong { color: var(--text); font-weight: 600; }
+.v-clash__btn { flex: 0 0 auto; border: none; border-radius: 9px; background: var(--brand); color: #fff; font-weight: 600; font-size: 0.8rem; padding: 8px 14px; cursor: pointer; transition: transform 0.08s, opacity 0.15s; }
+.v-clash__btn:active { transform: scale(0.95); }
+.v-clash__btn:disabled { opacity: 0.6; cursor: default; }
+.v-clash__sent { flex: 0 0 auto; font-size: 0.8rem; font-weight: 700; color: var(--ok); }
+.v-clash__block { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 0.82rem; font-weight: 600; color: var(--danger); }
 .m-spin { width: 22px; height: 22px; border: 2.5px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: m-spin 0.7s linear infinite; display: inline-block; }
 .m-skel { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: m-shimmer 1.3s linear infinite; border-radius: 10px; }
 .m-sheet-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.5); animation: m-fade 0.2s ease; }

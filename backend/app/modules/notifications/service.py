@@ -9,7 +9,7 @@ Future: replace bus.subscribe with a Redis/Celery task queue for async delivery.
 """
 
 from sqlalchemy.orm import Session
-from app.modules.models import Notification, NotificationType, User, Booking, SlotReleaseRequest, Event
+from app.modules.models import Notification, NotificationType, User, Booking, SlotReleaseRequest, Event, Resource
 from app.core.events import bus
 from app.core.database import SessionLocal
 
@@ -125,10 +125,23 @@ def on_release_requested(payload: dict):
         req = db.query(SlotReleaseRequest).filter(SlotReleaseRequest.id == payload.get("request_id")).first()
         if not req:
             return
+        # enrich the holder's notification with who/where/when (pulled from the
+        # held booking + the requester), so the alert is self-explanatory.
+        requester = db.query(User).filter(User.id == req.requester_id).first()
+        booking = db.query(Booking).filter(Booking.id == req.booking_id).first()
+        resource = db.query(Resource).filter(Resource.id == booking.resource_id).first() if booking else None
+        who = requester.full_name if requester else "Someone"
+        room = resource.name if resource else "a room"
+        when = ""
+        if booking is not None:
+            try:
+                when = f" — {booking.start_time.strftime('%b %d, %H:%M')}–{booking.end_time.strftime('%H:%M')}"
+            except Exception:
+                when = ""
         _notify(
             db, req.holder_id, NotificationType.EVENT_UPDATED,
-            "Slot requested",
-            "Someone requested a slot you hold. Open Requests to accept or decline.",
+            f"Slot request: {room}",
+            f"{who} requested {room}{when}. Open Slot Requests to accept, move or decline.",
             booking_id=req.booking_id,
         )
     finally:

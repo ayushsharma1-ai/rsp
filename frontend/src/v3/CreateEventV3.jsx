@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { format } from 'date-fns'
+import { AlertTriangle } from 'lucide-react'
 import api from '../lib/api'
 import { Btn, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
@@ -24,6 +26,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
   const [realGroups, setRealGroups] = useState([])
   const [clashes, setClashes] = useState([])
   const [requested, setRequested] = useState({})
+  const [sending, setSending] = useState(null)     // booking_id currently being requested
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -62,6 +65,8 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
   const toggleAll = () => setGroups(allGroupsOn ? [] : GROUPS.map(g => g.key))
 
   const sendRequest = async (vb) => {
+    if (sending) return
+    setSending(vb.booking_id)
     try {
       await api.post('/release-requests', {
         booking_id: vb.booking_id, message: '',
@@ -71,8 +76,17 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
           resource_id: vb.resource_id, group_ids: groupIds, category: 'adhoc',
         },
       })
-      setRequested(p => ({ ...p, [vb.booking_id]: true })); snack('Request sent')
-    } catch { snack('Could not send request') }
+      setRequested(p => ({ ...p, [vb.booking_id]: true }))
+      // clear, well-formatted confirmation, then close the create sheet
+      const tl = (v) => TIME_SLOTS.find(s => s.value === v)?.label || v
+      const dayLabel = format(new Date(`${date}T00:00`), 'EEE, MMM d')
+      snack(`Request sent to ${vb.holder_name} — ${vb.resource_name}, ${dayLabel} · ${tl(startT)}–${tl(endT)}`)
+      onClose && onClose()
+    } catch {
+      snack('Could not send request — try again.')
+    } finally {
+      setSending(null)
+    }
   }
 
   const submit = async () => {
@@ -161,24 +175,28 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
         </div>
 
         {clashes.length > 0 && (
-          <div className="m-warn">
-            <strong>⚠ {clashes.length} possible clash{clashes.length > 1 ? 'es' : ''}</strong>
+          <div className="v-clash">
+            <div className="v-clash__head"><AlertTriangle size={16} /> Scheduling conflict</div>
             {clashes.map(c => (
-              <div key={c.event_id} style={{ marginTop: 6 }}>
-                <div style={{ fontWeight: 600 }}>{c.title}
-                  {c.venue_clash && <span className="m-muted"> · same room</span>}
-                  {c.student_clash && <span style={{ color: 'var(--danger)' }}> · {c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
+              <div key={c.event_id} className="v-clash__item">
+                <div className="v-clash__name">{c.title}</div>
+                <div className="v-clash__tags">
+                  {c.venue_clash && <span className="v-clash__tag">Same room</span>}
+                  {c.student_clash && <span className="v-clash__tag v-clash__tag--block">{c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
                 </div>
                 {(c.venue_bookings || []).map(vb => (
-                  <div key={vb.booking_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4, fontSize: '0.84rem' }}>
-                    <span>{vb.resource_name} · {vb.holder_name}</span>
-                    {requested[vb.booking_id] ? <em style={{ color: 'var(--ok)' }}>sent ✓</em>
-                      : <button type="button" className="m-link" onClick={() => sendRequest(vb)}>Request</button>}
+                  <div key={vb.booking_id} className="v-clash__row">
+                    <span className="v-clash__room">{vb.resource_name} · held by <strong>{vb.holder_name}</strong></span>
+                    {requested[vb.booking_id]
+                      ? <span className="v-clash__sent">Sent ✓</span>
+                      : <button type="button" className="v-clash__btn" disabled={sending === vb.booking_id} onClick={() => sendRequest(vb)}>
+                          {sending === vb.booking_id ? 'Sending…' : 'Request'}
+                        </button>}
                   </div>
                 ))}
               </div>
             ))}
-            {hasStudentClash && <div style={{ color: 'var(--danger)', marginTop: 8, fontWeight: 600 }}>Student clash blocks booking.</div>}
+            {hasStudentClash && <div className="v-clash__block">Students here are already booked at this time — this slot can’t be booked. Pick another time.</div>}
           </div>
         )}
 
