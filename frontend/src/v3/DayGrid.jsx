@@ -4,17 +4,7 @@ import { X } from 'lucide-react'
 import { Btn } from '../mobile/ui'
 import { haptic } from '../mobile/theme'
 import { readableOn } from './config'
-import { DAY_START, DAY_END, DAY_PX, hhmm, evMins, layoutOverlaps } from './dayConsts'
-
-// Find the nearest scrollable ancestor so we can auto-scroll to "now" no matter
-// where the grid is mounted (calendar page OR the move-event overlay).
-function scrollableAncestor(el) {
-  for (let p = el?.parentElement; p; p = p.parentElement) {
-    const oy = getComputedStyle(p).overflowY
-    if (oy === 'auto' || oy === 'scroll') return p
-  }
-  return null
-}
+import { DAY_START, DAY_END, DAY_PX, hhmm, evMins, layoutOverlaps, scrollToHour } from './dayConsts'
 
 // The touch day grid: time rows, events (overlaps side-by-side), tap+drag to
 // pick a slot, "now" line, and a confirm bar. Shared by event-create and
@@ -63,12 +53,9 @@ export default function DayGrid({ cursor, today, events, eventColor, confirmLabe
     }
   }, [])
 
-  // open at "now" (today) / ~8am, instead of always at 7am
+  // open at the current hour (today) or 8 AM (any other day)
   useEffect(() => {
-    const sc = scrollableAncestor(gridRef.current)
-    if (!sc) return
-    const hour = isToday ? new Date().getHours() : 8
-    sc.scrollTo({ top: Math.max(0, (hour - DAY_START - 0.5) * DAY_PX), behavior: 'auto' })
+    scrollToHour(gridRef.current, isToday ? new Date().getHours() : 8, DAY_PX)
   }, [cursor]) // eslint-disable-line
 
   const overlapping = box ? dayEvents.filter(e => evMins(e.start) < box.end && evMins(e.end) > box.start && e.status !== 'cancelled') : []

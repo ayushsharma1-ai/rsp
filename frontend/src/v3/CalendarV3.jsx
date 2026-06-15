@@ -15,7 +15,7 @@ import { useAutoRefresh } from './useAutoRefresh'
 import CreateEventV3 from './CreateEventV3'
 import SheetV3 from './SheetV3'
 import DayGrid from './DayGrid'
-import { DAY_START, DAY_END, WK_PX, evMins } from './dayConsts'
+import { DAY_START, DAY_END, WK_PX, evMins, scrollToHour } from './dayConsts'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -211,6 +211,9 @@ function WeekView({ cursor, today, events, eventColor, loading, onPickDay, onEve
   const hours = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i)
   const sx = useRef(null)
   const swiped = useRef(false)   // suppress the tap that follows a swipe
+  const gridRef = useRef(null)
+  // open the week scrolled to 8 AM (the 24h grid otherwise starts at midnight)
+  useEffect(() => { scrollToHour(gridRef.current, 8, WK_PX) }, [cursor]) // eslint-disable-line
   const onTS = (e) => { sx.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; swiped.current = false }
   const onTE = (e) => {
     if (!sx.current) return
@@ -231,7 +234,7 @@ function WeekView({ cursor, today, events, eventColor, loading, onPickDay, onEve
           </button>
         ))}
       </div>
-      <div className="v-week__grid" style={{ height: (DAY_END - DAY_START) * WK_PX }}>
+      <div className="v-week__grid" ref={gridRef} style={{ height: (DAY_END - DAY_START) * WK_PX }}>
         <div className="v-week__gutter">
           {hours.map(h => <div key={h} className="v-week__hlabel" style={{ height: WK_PX }}>{format(new Date().setHours(h, 0), 'ha')}</div>)}
         </div>

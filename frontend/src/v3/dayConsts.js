@@ -9,6 +9,22 @@ export const hhmm = (mins) =>
 
 export const evMins = (iso) => { const d = parseISO(iso); return d.getHours() * 60 + d.getMinutes() }
 
+// Scroll the grid's nearest scrollable ancestor so `hour` sits near the top.
+// Accounts for any header above the grid (uses bounding-rect offset, not a raw
+// hour*px guess), so it lands on the right time in both day and week views.
+export function scrollToHour(gridEl, hour, pxPerHour) {
+  if (!gridEl) return
+  let sc = gridEl.parentElement
+  while (sc) {
+    const oy = getComputedStyle(sc).overflowY
+    if (oy === 'auto' || oy === 'scroll') break
+    sc = sc.parentElement
+  }
+  if (!sc) return
+  const gridTop = gridEl.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop
+  sc.scrollTo({ top: Math.max(0, gridTop + (hour - DAY_START) * pxPerHour - 8), behavior: 'auto' })
+}
+
 // Lay overlapping day events into side-by-side columns. Returns [{ e, col, cols }].
 export function layoutOverlaps(evts) {
   const items = evts
