@@ -1,7 +1,7 @@
 // Shared day/week grid constants + helpers (used by CalendarV3 and DayGrid).
 import { parseISO } from 'date-fns'
 
-export const DAY_START = 7, DAY_END = 22
+export const DAY_START = 0, DAY_END = 24   // full 24-hour grid
 export const DAY_PX = 56, WK_PX = 44
 
 export const hhmm = (mins) =>

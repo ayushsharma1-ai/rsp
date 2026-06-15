@@ -186,10 +186,11 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-dayhead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
 .v-dayhead__num { font-size: 1.5rem; font-weight: 800; }
 .v-dayhead__num--today { color: var(--brand); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; }
-.v-grid { position: relative; border-top: 1px solid var(--border); }
-.v-hour { position: relative; height: 56px; border-bottom: 1px solid var(--border); }
+.v-grid { position: relative; }   /* hour lines come from .v-grid__col, never the gutter */
+.v-hour { position: relative; height: 56px; }   /* no full-width line — see .v-grid__col */
 .v-hour__label { position: absolute; left: 0; top: -8px; width: 48px; font-size: 0.68rem; color: var(--text-3); text-align: right; padding-right: 8px; }
-.v-grid__col { position: absolute; left: 56px; right: 0; top: 0; bottom: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* hour lines drawn ONLY in the events area (start after the time gutter) */
+.v-grid__col { position: absolute; left: 56px; right: 0; top: 0; bottom: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 55px, var(--border) 55px, var(--border) 56px); }
 .v-event { position: absolute; left: 2px; right: 4px; border-radius: 9px; padding: 4px 8px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
 .v-event__t { font-size: 0.76rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: inherit; }
 .v-event__time { font-size: 0.68rem; opacity: 0.85; color: inherit; }
