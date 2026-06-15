@@ -6,6 +6,7 @@ import api from '../lib/api'
 import { ListSkeleton, Empty, Btn, useSnack } from '../mobile/ui'
 import { toISO, fdate } from '../mobile/lib'
 import { useAutoRefresh } from './useAutoRefresh'
+import { useBackClose } from './useBackClose'
 import DayGrid from './DayGrid'
 
 const STATUS_LABEL = {
@@ -90,6 +91,9 @@ function MoveDayPicker({ req, onClose, onConfirm }) {
   const [events, setEvents] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // back button closes the move overlay rather than navigating away
+  useBackClose(true, onClose)
 
   const load = useCallback(() => {
     setEvents(null)

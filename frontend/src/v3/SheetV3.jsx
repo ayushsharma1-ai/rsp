@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
+import { useBackClose } from './useBackClose'
 
 // Bottom sheet that collapses when you drag it down (slide finger back).
 // Rendered through a portal to <body> so it always sits ABOVE the fixed tab bar
@@ -10,6 +11,9 @@ export default function SheetV3({ open, onClose, title, children }) {
   const startY = useRef(null)
   const sheetH = useRef(0)
   const ref = useRef(null)
+
+  // device/browser back closes the sheet instead of leaving the page
+  useBackClose(open, onClose)
 
   useEffect(() => {
     if (!open) { setDrag(0); return }
