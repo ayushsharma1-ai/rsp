@@ -69,3 +69,17 @@ class UserService:
             Notification.is_read == False
         ).update({"is_read": True})
         self.db.commit()
+
+    def set_notification_read(self, user_id: str, notif_id: str, is_read: bool) -> Notification:
+        """Mark a SINGLE notification read/unread. Scoped to the owner so one user
+        can't toggle another's notifications."""
+        n = self.db.query(Notification).filter(
+            Notification.id == notif_id,
+            Notification.recipient_id == user_id,
+        ).first()
+        if not n:
+            raise HTTPException(status_code=404, detail="Notification not found")
+        n.is_read = is_read
+        self.db.commit()
+        self.db.refresh(n)
+        return n

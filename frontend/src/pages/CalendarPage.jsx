@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../lib/api'
+import { downloadICS } from '../lib/ics'
 import { useAuthStore } from '../store/authStore'
 import { PageHeader, Spinner, Card, Btn, Modal, Badge } from '../components/ui'
 import { CreateEventModal } from './DashboardPage'
@@ -7,7 +9,7 @@ import {
   format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks,
   isSameDay, parseISO
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Trash2, Move } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Trash2, Move, CalendarPlus } from 'lucide-react'
 
 const HOUR_START  = 0
 const HOUR_END    = 24
@@ -56,6 +58,7 @@ export default function CalendarPage() {
   const resizing  = useRef(null)
   const gridRef   = useRef(null)
   const scrollRef = useRef(null)
+  const [sp, setSp] = useSearchParams()
 
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 })
   const days    = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -89,6 +92,26 @@ export default function CalendarPage() {
   useEffect(() => {
     api.get('/resources').then(r => setResources(r.data)).catch(() => {})
   }, [])
+
+  // Deep link from a notification: /calendar?event=<id> jumps to that event's
+  // week and opens its detail modal, then strips the param.
+  useEffect(() => {
+    const evId = sp.get('event')
+    if (!evId) return
+    let cancelled = false
+    api.get(`/events/${evId}`)
+      .then(r => {
+        if (cancelled) return
+        setSelected({ ...r.data, origStart: r.data.start_time, is_recurring: r.data.is_recurring_root })
+        if (r.data.start_time) setWeekStart(startOfWeek(parseISO(r.data.start_time), { weekStartsOn: 1 }))
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (cancelled) return
+        const next = new URLSearchParams(sp); next.delete('event'); setSp(next, { replace: true })
+      })
+    return () => { cancelled = true }
+  }, [sp.get('event')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // On first open, scroll the grid to working hours (~8 AM) instead of midnight
   useEffect(() => {
@@ -704,6 +727,23 @@ function EventDetailModal({
           <span className="detail-value">{e.is_public ? 'Public' : 'Private'}</span>
         </div>
 
+      </div>
+
+      {/* Add to personal calendar — available to anyone viewing the event */}
+      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+        <Btn
+          variant="ghost"
+          onClick={() => downloadICS({
+            id: e.id,
+            title: e.title,
+            description: e.description,
+            start: e.start_time || e.origStart,
+            end: e.end_time,
+            location: (e.bookings || []).map(b => b.resource_name).filter(Boolean).join(', '),
+          })}
+        >
+          <CalendarPlus size={14} /> Add to my calendar
+        </Btn>
       </div>
 
       {/* Actions */}

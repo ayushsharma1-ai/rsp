@@ -34,6 +34,7 @@ def my_notifications(
             "is_read": n.is_read,
             "created_at": n.created_at.isoformat(),
             "booking_id": n.related_booking_id,
+            "event_id": n.related_event_id,
         }
         for n in notifs
     ]
@@ -45,6 +46,24 @@ def mark_read(
     current_user: User = Depends(get_current_user),
 ):
     UserService(db).mark_notifications_read(current_user.id)
+
+
+@router.post("/me/notifications/{notif_id}/read", status_code=204)
+def mark_one_read(
+    notif_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    UserService(db).set_notification_read(current_user.id, notif_id, True)
+
+
+@router.post("/me/notifications/{notif_id}/unread", status_code=204)
+def mark_one_unread(
+    notif_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    UserService(db).set_notification_read(current_user.id, notif_id, False)
 
 
 @router.get("/{user_id}", response_model=UserOut)

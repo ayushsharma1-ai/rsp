@@ -20,10 +20,13 @@ export default function DayGrid({ cursor, today, events, eventColor, confirmLabe
   // clear the selection when an owning sheet closes (create flow passes its open flag)
   useEffect(() => { if (sheetOpen === false) setBox(null) }, [sheetOpen])
 
+  // Snap to 30-min increments so selected times always exist in the create/edit
+  // dropdowns (TIME_SLOTS is :00/:30 only). 15-min snapping produced :15/:45
+  // values the pickers couldn't represent — the root of the "30-min" glitch.
   const yToMin = (clientY) => {
     const rect = gridRef.current?.getBoundingClientRect()
     if (!rect) return DAY_START * 60
-    const m = DAY_START * 60 + Math.round(((clientY - rect.top) / DAY_PX) * 60 / 15) * 15
+    const m = DAY_START * 60 + Math.round(((clientY - rect.top) / DAY_PX) * 60 / 30) * 30
     return Math.max(DAY_START * 60, Math.min(DAY_END * 60, m))
   }
   const tapGrid = (e) => {
@@ -39,8 +42,8 @@ export default function DayGrid({ cursor, today, events, eventColor, confirmLabe
       const m = yToMin(cy)
       setBox(b => {
         if (!b) return b
-        if (dragHandle.current === 'top') return { ...b, start: Math.min(m, b.end - 15) }
-        return { ...b, end: Math.max(m, b.start + 15) }
+        if (dragHandle.current === 'top') return { ...b, start: Math.min(m, b.end - 30) }
+        return { ...b, end: Math.max(m, b.start + 30) }
       })
       ev.preventDefault()
     }

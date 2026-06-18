@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { formatDistanceToNow, isToday, parseISO } from 'date-fns'
 import { Bell, CheckCheck, Calendar, ArrowLeftRight, AlertTriangle, Info } from 'lucide-react'
 import api from '../lib/api'
@@ -15,8 +16,21 @@ const iconFor = (n) => {
 const ago = (s) => { try { return formatDistanceToNow(parseISO(s), { addSuffix: true }) } catch { return '' } }
 const isFromToday = (s) => { try { return isToday(parseISO(s)) } catch { return false } }
 
+// Where a notification should take you when tapped.
+// event_id  → open that event on the calendar
+// booking.* → the Bookings list
+// slot request (event_updated + a booking_id, no event_id) → Slot Requests
+const targetFor = (n) => {
+  if (n.event_id) return `/?event=${n.event_id}`
+  const type = (n.type || '').toLowerCase()
+  if (type.startsWith('booking')) return '/bookings'
+  if (n.booking_id) return '/requests'
+  return null
+}
+
 export function NotificationsV3() {
   const snack = useSnack()
+  const navigate = useNavigate()
   const [items, setItems] = useState(null)
 
   const load = useCallback((silent = false) => {
@@ -27,8 +41,28 @@ export function NotificationsV3() {
   useAutoRefresh(() => load(true), 25000)
 
   const markAll = async () => {
-    try { await api.post('/users/me/notifications/read'); snack('All caught up'); load() }
-    catch { snack('Failed') }
+    setItems(prev => (prev || []).map(n => ({ ...n, is_read: true })))
+    try { await api.post('/users/me/notifications/read'); snack('All caught up') }
+    catch { snack('Failed'); load(true) }
+  }
+
+  // Tap a notification → auto-mark read, then deep-link to its subject.
+  const open = (n) => {
+    if (!n.is_read) {
+      setItems(prev => (prev || []).map(x => x.id === n.id ? { ...x, is_read: true } : x))
+      api.post(`/users/me/notifications/${n.id}/read`).catch(() => {})
+    }
+    const to = targetFor(n)
+    if (to) navigate(to)
+    else snack('Nothing more to open')
+  }
+
+  // Explicit read/unread toggle (the dot doubles as the button).
+  const toggleRead = (e, n) => {
+    e.stopPropagation()
+    const next = !n.is_read
+    setItems(prev => (prev || []).map(x => x.id === n.id ? { ...x, is_read: next } : x))
+    api.post(`/users/me/notifications/${n.id}/${next ? 'read' : 'unread'}`).catch(() => {})
   }
 
   const unread = (items || []).filter(n => !n.is_read)
@@ -38,7 +72,9 @@ export function NotificationsV3() {
   const Row = (n) => {
     const Icon = iconFor(n)
     return (
-      <div key={n.id} className={`v-notif ${n.is_read ? '' : 'v-notif--unread'}`}>
+      <div key={n.id} role="button" tabIndex={0} onClick={() => open(n)}
+        onKeyDown={(e) => { if (e.key === 'Enter') open(n) }}
+        className={`v-notif ${n.is_read ? '' : 'v-notif--unread'}`} style={{ cursor: 'pointer' }}>
         <div className="v-notif__icon"><Icon size={17} /></div>
         <div className="v-notif__body">
           <div className="v-notif__top">
@@ -47,7 +83,16 @@ export function NotificationsV3() {
           </div>
           {n.message && <div className="v-notif__msg">{n.message}</div>}
         </div>
-        {!n.is_read && <span className="v-notif__dot" />}
+        <button onClick={(e) => toggleRead(e, n)}
+          title={n.is_read ? 'Mark as unread' : 'Mark as read'}
+          aria-label={n.is_read ? 'Mark as unread' : 'Mark as read'}
+          style={{ background: 'none', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <span style={{
+            width: 9, height: 9, borderRadius: '50%', display: 'inline-block',
+            background: n.is_read ? 'transparent' : 'var(--accent, #5b6ef5)',
+            border: n.is_read ? '1.5px solid var(--text-3, #94a3b8)' : 'none',
+          }} />
+        </button>
       </div>
     )
   }

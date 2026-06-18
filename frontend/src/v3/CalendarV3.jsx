@@ -4,8 +4,9 @@ import {
   format, startOfMonth, startOfWeek, addMonths, addWeeks, addDays,
   startOfDay, endOfDay, isSameDay, isSameMonth, parseISO,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, CalendarPlus } from 'lucide-react'
 import api from '../lib/api'
+import { downloadICS } from '../lib/ics'
 import { useAuthStore } from '../store/authStore'
 import { Btn, DetailRow, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
@@ -82,6 +83,22 @@ export function CalendarV3() {
   useEffect(() => { load() }, [load])
   // Pick up other users' changes without a manual reload (poll + on-focus).
   useAutoRefresh(() => { load(true); loadVenues() }, 25000)
+
+  // Deep link from a notification: /?event=<id> opens that event's detail sheet,
+  // then strips the param so Back doesn't re-open it.
+  useEffect(() => {
+    const evId = sp.get('event')
+    if (!evId) return
+    let cancelled = false
+    api.get(`/events/${evId}`)
+      .then(r => { if (!cancelled) setSel({ ...r.data, blockStart: r.data.start_time, blockEnd: r.data.end_time, is_recurring: r.data.is_recurring_root }) })
+      .catch(() => { if (!cancelled) snack('That event is no longer available') })
+      .finally(() => {
+        if (cancelled) return
+        const next = new URLSearchParams(sp); next.delete('event'); setSp(next, { replace: true })
+      })
+    return () => { cancelled = true }
+  }, [sp.get('event')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const eventVenue = (e) => venueKeyForName(venueByEvent[e.id])
   const eventColor = (e) => e.color || venueColorForName(venueByEvent[e.id])
@@ -165,6 +182,14 @@ export function CalendarV3() {
               <DetailRow label="End" value={format(parseISO(sel.blockEnd || sel.end_time), 'HH:mm')} />
               {sel.organizer_name && <DetailRow label="Organizer" value={sel.organizer_name} />}
               {(sel.bookings || []).length > 0 && <DetailRow label="Venue" value={sel.bookings.map(b => b.resource_name).join(', ')} />}
+              <Btn full variant="ghost" style={{ marginTop: 14 }} onClick={() => {
+                downloadICS({
+                  id: sel.id, title: sel.title, description: sel.description,
+                  start: sel.blockStart || sel.start_time, end: sel.blockEnd || sel.end_time,
+                  location: (sel.bookings || []).map(b => b.resource_name).filter(Boolean).join(', '),
+                })
+                snack('Opening your calendar…')
+              }}><CalendarPlus size={16} /> Add to my calendar</Btn>
               {canAct && (
                 <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
                   <Btn variant="primary" full onClick={() => { setMoving(sel); setSel(null) }}>Edit event</Btn>
