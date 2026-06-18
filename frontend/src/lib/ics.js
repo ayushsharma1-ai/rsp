@@ -1,8 +1,9 @@
-// Build and download an .ics (iCalendar) file for a single event.
-// Tapping the downloaded file opens the device's native calendar app
-// (Apple Calendar / Google Calendar / Outlook) pre-filled with the event,
-// so the user adds it to their PERSONAL calendar in one or two taps.
-// Pure client-side — no backend call, works offline.
+// "Add to my personal calendar" — get a DIRECT add-event prompt (not a silent
+// download) across devices:
+//   • Android / desktop → open Google Calendar's prefilled add-event screen.
+//   • iPhone / iPad      → open the .ics INLINE so iOS shows Apple Calendar's
+//                          "Add Event" sheet (instead of saving a file).
+//   • popup blocked / anything else → fall back to downloading the .ics.
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -22,6 +23,12 @@ function esc(s = '') {
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
     .replace(/\r?\n/g, '\\n')
+}
+
+function isIOS() {
+  const ua = navigator.userAgent || ''
+  // iPadOS 13+ reports as "Macintosh" but is touch-capable.
+  return /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document)
 }
 
 // evt: { id, title, description, start, end, location }
@@ -46,6 +53,19 @@ export function eventToICS(evt) {
   return lines.join('\r\n')
 }
 
+// Google Calendar "template" URL — opens the add-event screen prefilled.
+export function googleCalUrl(evt) {
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: evt.title || 'Event',
+    dates: `${toICSDate(evt.start)}/${toICSDate(evt.end)}`,
+  })
+  if (evt.description) p.set('details', evt.description)
+  if (evt.location) p.set('location', evt.location)
+  return `https://calendar.google.com/calendar/render?${p.toString()}`
+}
+
+// Last-resort: save the .ics file (user opens it manually).
 export function downloadICS(evt) {
   const blob = new Blob([eventToICS(evt)], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -56,4 +76,21 @@ export function downloadICS(evt) {
   a.click()
   document.body.removeChild(a)
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// Main entry — pick the method that gives a direct "add to calendar" prompt.
+// Returns a short string describing what it did (handy for a snackbar message).
+export function addToCalendar(evt) {
+  if (isIOS()) {
+    // Navigating to a text/calendar data URL makes iOS Safari offer "Add to Calendar".
+    window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(eventToICS(evt))}`
+    return 'ios'
+  }
+  // Android / desktop: open Google Calendar's prefilled add screen in a new tab.
+  const w = window.open(googleCalUrl(evt), '_blank', 'noopener')
+  if (!w) {                 // popup blocked → download the .ics so nothing is lost
+    downloadICS(evt)
+    return 'download'
+  }
+  return 'google'
 }

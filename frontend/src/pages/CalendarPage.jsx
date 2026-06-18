@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../lib/api'
-import { downloadICS } from '../lib/ics'
+import { addToCalendar } from '../lib/ics'
 import { useAuthStore } from '../store/authStore'
 import { PageHeader, Spinner, Card, Btn, Modal, Badge } from '../components/ui'
 import { CreateEventModal } from './DashboardPage'
@@ -733,7 +733,7 @@ function EventDetailModal({
       <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
         <Btn
           variant="ghost"
-          onClick={() => downloadICS({
+          onClick={() => addToCalendar({
             id: e.id,
             title: e.title,
             description: e.description,

@@ -6,7 +6,7 @@ import {
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, CalendarPlus } from 'lucide-react'
 import api from '../lib/api'
-import { downloadICS } from '../lib/ics'
+import { addToCalendar } from '../lib/ics'
 import { useAuthStore } from '../store/authStore'
 import { Btn, DetailRow, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
@@ -183,12 +183,12 @@ export function CalendarV3() {
               {sel.organizer_name && <DetailRow label="Organizer" value={sel.organizer_name} />}
               {(sel.bookings || []).length > 0 && <DetailRow label="Venue" value={sel.bookings.map(b => b.resource_name).join(', ')} />}
               <Btn full variant="ghost" style={{ marginTop: 14 }} onClick={() => {
-                downloadICS({
+                const how = addToCalendar({
                   id: sel.id, title: sel.title, description: sel.description,
                   start: sel.blockStart || sel.start_time, end: sel.blockEnd || sel.end_time,
                   location: (sel.bookings || []).map(b => b.resource_name).filter(Boolean).join(', '),
                 })
-                snack('Opening your calendar…')
+                snack(how === 'download' ? 'Calendar file saved — open it to add' : 'Opening your calendar…')
               }}><CalendarPlus size={16} /> Add to my calendar</Btn>
               {canAct && (
                 <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
