@@ -1,9 +1,11 @@
-// "Add to my personal calendar" — get a DIRECT add-event prompt (not a silent
-// download) across devices:
-//   • Android / desktop → open Google Calendar's prefilled add-event screen.
-//   • iPhone / iPad      → open the .ics INLINE so iOS shows Apple Calendar's
-//                          "Add Event" sheet (instead of saving a file).
-//   • popup blocked / anything else → fall back to downloading the .ics.
+// "Add to my personal calendar":
+//   • Android → fire the native ACTION_INSERT calendar intent via an `intent://`
+//     URL. Chrome hands it to the OS, which opens the phone's calendar app on a
+//     prefilled "new event" screen (the app chooser appears if several handle it).
+//     No file, no browser. If nothing handles it, we fall back to the .ics.
+//   • iOS / desktop → no web way to launch the native calendar app, so we save
+//     the .ics (opening it hands off to Apple Calendar / the default app).
+// (googleCalUrl is kept as an optional "add on the web" alternative if wanted.)
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -25,10 +27,24 @@ function esc(s = '') {
     .replace(/\r?\n/g, '\\n')
 }
 
-function isIOS() {
-  const ua = navigator.userAgent || ''
-  // iPadOS 13+ reports as "Macintosh" but is touch-capable.
-  return /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document)
+const isAndroid = () => /Android/i.test(navigator.userAgent || '')
+
+// Android `intent://` URL that opens the calendar app's "new event" screen,
+// prefilled. Uses CalendarContract's INSERT action + typed extras
+// (l.=long ms, S.=string). Values are URL-encoded so ';' etc. don't break it.
+function androidIntentUrl(evt) {
+  const begin = new Date(evt.start).getTime()
+  const end = new Date(evt.end).getTime()
+  const body = [
+    'action=android.intent.action.INSERT',
+    'type=vnd.android.cursor.item/event',
+    `l.beginTime=${begin}`,
+    `l.endTime=${end}`,
+    `S.title=${encodeURIComponent(evt.title || 'Event')}`,
+    evt.location ? `S.eventLocation=${encodeURIComponent(evt.location)}` : null,
+    evt.description ? `S.description=${encodeURIComponent(evt.description)}` : null,
+  ].filter(Boolean).join(';')
+  return `intent:#Intent;${body};end`
 }
 
 // evt: { id, title, description, start, end, location }
@@ -78,19 +94,28 @@ export function downloadICS(evt) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-// Main entry — pick the method that gives a direct "add to calendar" prompt.
-// Returns a short string describing what it did (handy for a snackbar message).
+// Main entry. Android → open the native calendar app directly; otherwise save
+// the .ics. Returns a short tag so the caller can phrase its toast.
 export function addToCalendar(evt) {
-  if (isIOS()) {
-    // Navigating to a text/calendar data URL makes iOS Safari offer "Add to Calendar".
-    window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(eventToICS(evt))}`
-    return 'ios'
+  if (isAndroid()) {
+    // If the calendar app actually opens, this page goes to the background and
+    // we cancel the fallback. If nothing handles the intent, save the .ics.
+    const fallback = setTimeout(() => downloadICS(evt), 1500)
+    document.addEventListener('visibilitychange', function onHide() {
+      if (document.hidden) {
+        clearTimeout(fallback)
+        document.removeEventListener('visibilitychange', onHide)
+      }
+    })
+    try {
+      window.location.href = androidIntentUrl(evt)
+    } catch (e) {
+      clearTimeout(fallback)
+      downloadICS(evt)
+      return 'download'
+    }
+    return 'android'
   }
-  // Android / desktop: open Google Calendar's prefilled add screen in a new tab.
-  const w = window.open(googleCalUrl(evt), '_blank', 'noopener')
-  if (!w) {                 // popup blocked → download the .ics so nothing is lost
-    downloadICS(evt)
-    return 'download'
-  }
-  return 'google'
+  downloadICS(evt)
+  return 'download'
 }

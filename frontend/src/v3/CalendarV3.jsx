@@ -188,7 +188,7 @@ export function CalendarV3() {
                   start: sel.blockStart || sel.start_time, end: sel.blockEnd || sel.end_time,
                   location: (sel.bookings || []).map(b => b.resource_name).filter(Boolean).join(', '),
                 })
-                snack(how === 'download' ? 'Calendar file saved — open it to add' : 'Opening your calendar…')
+                snack(how === 'android' ? 'Opening your calendar app…' : 'Calendar file ready — open it to add')
               }}><CalendarPlus size={16} /> Add to my calendar</Btn>
               {canAct && (
                 <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
