@@ -48,7 +48,7 @@ export default function LoginV3() {
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24, padding: 24 }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--brand)', color: '#fff', fontFamily: 'Syne', fontWeight: 800, fontSize: '1.4rem', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>RSP</div>
+        <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--grad-brand)', boxShadow: 'var(--glow-brand)', color: '#fff', fontFamily: 'Syne', fontWeight: 800, fontSize: '1.4rem', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>RSP</div>
         <h1 className="v-h" style={{ margin: 0, fontSize: '1.8rem' }}>Scheduler</h1>
         <p className="m-muted" style={{ margin: '4px 0 0' }}>{isRegister ? 'Create your account.' : 'Book rooms, labs and events.'}</p>
       </div>

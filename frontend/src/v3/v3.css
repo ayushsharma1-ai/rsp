@@ -272,3 +272,79 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
   .v-fab { right: calc(50% - 230px + 18px); }
   .m-snackbar { max-width: 428px; left: 50%; right: auto; transform: translateX(-50%); }
 }
+
+/* ============================================================
+   PREMIUM POLISH LAYER (v3) — depth, gradient accent, motion.
+   Appended last so it overrides the flat base. Delete this whole
+   block to revert to the original styling.
+   ============================================================ */
+:root {
+  --grad-brand: linear-gradient(135deg, #5b6ef5 0%, #7c5cff 100%);
+  --grad-brand-press: linear-gradient(135deg, #4a5be0 0%, #6a49f0 100%);
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --elev-1: 0 1px 2px rgba(0,0,0,.45);
+  --elev-2: 0 8px 26px rgba(0,0,0,.42);
+  --elev-3: 0 24px 64px rgba(0,0,0,.55);
+  --glow-brand: 0 6px 22px rgba(91,110,245,.50);
+  --hairline: inset 0 1px 0 rgba(255,255,255,.07);
+  --ring-focus: 0 0 0 3px rgba(91,110,245,.32);
+  --surface-hi: rgba(255,255,255,.05);
+}
+[data-theme="light"] {
+  --elev-1: 0 1px 2px rgba(15,23,42,.10);
+  --elev-2: 0 10px 26px rgba(15,23,42,.10);
+  --elev-3: 0 24px 64px rgba(15,23,42,.16);
+  --glow-brand: 0 8px 22px rgba(91,110,245,.26);
+  --hairline: inset 0 1px 0 rgba(255,255,255,.75);
+  --ring-focus: 0 0 0 3px rgba(91,110,245,.20);
+  --surface-hi: rgba(255,255,255,.65);
+}
+
+/* page backdrop — faint brand glow up top for depth */
+.v-app { background: radial-gradient(135% 90% at 50% -12%, color-mix(in srgb, var(--brand) 8%, var(--bg)) 0%, var(--bg) 55%); }
+
+/* primary actions → gradient fill + glow */
+.m-btn { box-shadow: var(--hairline); transition: transform .1s var(--ease), background .15s, box-shadow .2s; }
+.m-btn--primary { background: var(--grad-brand); box-shadow: var(--glow-brand), var(--hairline); }
+.m-btn--primary:active { background: var(--grad-brand-press); }
+.m-btn--ghost { box-shadow: none; }
+.m-chip--active { background: var(--grad-brand); border-color: transparent; box-shadow: var(--glow-brand); }
+
+/* surfaces → subtle top sheen + depth */
+.m-card { background: linear-gradient(180deg, var(--surface-hi), transparent), var(--surface); box-shadow: var(--elev-1), var(--hairline); }
+.m-input:focus { box-shadow: var(--ring-focus); }
+.m-sheet { box-shadow: var(--elev-3), var(--hairline); }
+.m-snackbar { box-shadow: var(--elev-2); }
+
+/* app chrome → glass + hairline + gradient accents */
+.v-iconbtn { border: 1px solid var(--border); box-shadow: var(--hairline); transition: transform .08s var(--ease), background .15s; }
+.v-tabbar { box-shadow: var(--hairline); }
+.v-tab--center .v-tab__badge { background: var(--grad-brand); box-shadow: var(--glow-brand), var(--hairline); }
+.v-fab { background: var(--grad-brand); box-shadow: var(--glow-brand), var(--hairline); transition: transform .12s var(--ease), box-shadow .2s; }
+.v-fab:active { box-shadow: var(--elev-1); }
+
+/* segmented control + filters */
+.v-seg { box-shadow: var(--hairline); }
+.v-seg button.v-seg--active { box-shadow: var(--elev-1); }
+.v-filter--on { box-shadow: var(--elev-1); }
+
+/* calendar event blocks → soft depth + glass sheen */
+.v-event { border-radius: 11px; box-shadow: var(--elev-1), inset 0 1px 0 rgba(255,255,255,.20); }
+.v-event::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(255,255,255,.16), transparent 42%); pointer-events: none; }
+.v-week__ev { box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+
+/* month cells + floating bars */
+.v-daycell { box-shadow: var(--hairline); transition: transform .06s var(--ease), border-color .15s; }
+.v-daycell--today { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); }
+.v-selbar { box-shadow: var(--elev-2), var(--hairline); }
+
+/* atoms reused across EVERY page → consistent premium feel everywhere */
+.m-avatar { background: var(--grad-brand); box-shadow: var(--glow-brand), var(--hairline); }
+.m-badge { box-shadow: var(--hairline); }
+.statbadge { box-shadow: var(--hairline); }
+.stat.is-on { box-shadow: var(--elev-1); }
+.v-pick--on { box-shadow: var(--elev-1); }
+.v-notif--unread .v-notif__icon { background: var(--grad-brand); color: #fff; box-shadow: var(--glow-brand); }
+.v-filter { transition: border-color .15s var(--ease), box-shadow .2s; }
+.m-eventrow { transition: transform .08s var(--ease), border-color .15s; }
+.m-eventrow:active { transform: scale(.99); }
