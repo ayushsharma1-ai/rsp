@@ -279,29 +279,57 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
    block to revert to the original styling.
    ============================================================ */
 :root {
-  --grad-brand: linear-gradient(135deg, #5b6ef5 0%, #7c5cff 100%);
-  --grad-brand-press: linear-gradient(135deg, #4a5be0 0%, #6a49f0 100%);
+  /* Graphite & amber palette (minimalist) — redefined last so it overrides the
+     base indigo tokens everywhere. Warm graphite neutrals + a restrained gold. */
+  --brand: #e0a64a;
+  --brand-press: #cf9333;
+  --bg: #100f0d;
+  --surface: #1a1815;
+  --surface-2: #252119;
+  --border: rgba(255,255,255,.11);
+  --text: #f1ede6;
+  --text-2: #b6ac9c;
+  --text-3: #847b6b;
+  --bar-bg: rgba(16,15,13,.82);
+  --link: #ecc16f;
+  --on-accent: #2a1f08;       /* dark text on the light amber accent */
+  --grad-brand: linear-gradient(135deg, #e7b25b 0%, #d4922f 100%);
+  --grad-brand-press: linear-gradient(135deg, #cf9333 0%, #b87d22 100%);
   --ease: cubic-bezier(.2,.8,.2,1);
-  --elev-1: 0 1px 2px rgba(0,0,0,.45);
-  --elev-2: 0 8px 26px rgba(0,0,0,.42);
-  --elev-3: 0 24px 64px rgba(0,0,0,.55);
-  --glow-brand: 0 6px 22px rgba(91,110,245,.50);
-  --hairline: inset 0 1px 0 rgba(255,255,255,.07);
-  --ring-focus: 0 0 0 3px rgba(91,110,245,.32);
-  --surface-hi: rgba(255,255,255,.05);
+  --elev-1: 0 1px 2px rgba(0,0,0,.5);
+  --elev-2: 0 8px 26px rgba(0,0,0,.45);
+  --elev-3: 0 24px 64px rgba(0,0,0,.6);
+  --glow-brand: 0 5px 18px rgba(224,166,74,.28);
+  --hairline: inset 0 1px 0 rgba(255,255,255,.06);
+  --ring-focus: 0 0 0 3px rgba(224,166,74,.30);
+  --surface-hi: rgba(255,255,255,.04);
 }
 [data-theme="light"] {
-  --elev-1: 0 1px 2px rgba(15,23,42,.10);
-  --elev-2: 0 10px 26px rgba(15,23,42,.10);
-  --elev-3: 0 24px 64px rgba(15,23,42,.16);
-  --glow-brand: 0 8px 22px rgba(91,110,245,.26);
-  --hairline: inset 0 1px 0 rgba(255,255,255,.75);
-  --ring-focus: 0 0 0 3px rgba(91,110,245,.20);
-  --surface-hi: rgba(255,255,255,.65);
+  --brand: #9a6a12;           /* deep gold — readable as text on light too */
+  --brand-press: #855a0c;
+  --bg: #f7f5f1;
+  --surface: #ffffff;
+  --surface-2: #f0ebe2;
+  --border: rgba(40,30,15,.12);
+  --text: #1c1a16;
+  --text-2: #6b6457;
+  --text-3: #9a9182;
+  --bar-bg: rgba(255,253,250,.86);
+  --link: #855a0c;
+  --on-accent: #ffffff;       /* white text on the deep-gold accent */
+  --grad-brand: linear-gradient(135deg, #a9761a 0%, #8c5f0e 100%);
+  --grad-brand-press: linear-gradient(135deg, #855a0c 0%, #6f4a08 100%);
+  --elev-1: 0 1px 2px rgba(40,30,15,.10);
+  --elev-2: 0 10px 26px rgba(40,30,15,.10);
+  --elev-3: 0 24px 64px rgba(40,30,15,.16);
+  --glow-brand: 0 8px 20px rgba(154,106,18,.20);
+  --hairline: inset 0 1px 0 rgba(255,255,255,.8);
+  --ring-focus: 0 0 0 3px rgba(154,106,18,.18);
+  --surface-hi: rgba(255,255,255,.7);
 }
 
 /* page backdrop — faint brand glow up top for depth */
-.v-app { background: radial-gradient(135% 90% at 50% -12%, color-mix(in srgb, var(--brand) 8%, var(--bg)) 0%, var(--bg) 55%); }
+.v-app { background: radial-gradient(135% 90% at 50% -12%, color-mix(in srgb, var(--brand) 5%, var(--bg)) 0%, var(--bg) 55%); }
 
 /* primary actions → gradient fill + glow */
 .m-btn { box-shadow: var(--hairline); transition: transform .1s var(--ease), background .15s, box-shadow .2s; }
@@ -309,6 +337,9 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .m-btn--primary:active { background: var(--grad-brand-press); }
 .m-btn--ghost { box-shadow: none; }
 .m-chip--active { background: var(--grad-brand); border-color: transparent; box-shadow: var(--glow-brand); }
+/* base CSS hardcodes white text on the accent — amber needs dark text instead */
+.m-btn--primary, .m-chip--active, .v-fab, .v-clash__btn,
+.v-tab--center .v-tab__badge, .m-avatar { color: var(--on-accent); }
 
 /* surfaces → subtle top sheen + depth */
 .m-card { background: linear-gradient(180deg, var(--surface-hi), transparent), var(--surface); box-shadow: var(--elev-1), var(--hairline); }
