@@ -379,3 +379,7 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-filter { transition: border-color .15s var(--ease), box-shadow .2s; }
 .m-eventrow { transition: transform .08s var(--ease), border-color .15s; }
 .m-eventrow:active { transform: scale(.99); }
+
+/* full-screen reschedule / move pickers — smooth premium entrance */
+.v-moveoverlay { animation: v-overlay-in .26s cubic-bezier(.2,.8,.2,1); }
+@keyframes v-overlay-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }

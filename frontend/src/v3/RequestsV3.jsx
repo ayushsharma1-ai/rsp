@@ -58,9 +58,9 @@ export function RequestsV3() {
                     {req.message && <div className="m-muted" style={{ fontSize: '0.84rem' }}>“{req.message}”</div>}
                     {req.status === 'requested' ? (
                       <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-                        <Btn variant="primary" full onClick={() => { if (window.confirm('Accept and cancel your event in this slot?')) accept(req.id, { mode: 'cancel' }).catch(() => snack('Failed')) }}>Accept & cancel mine</Btn>
+                        <Btn variant="primary" full onClick={() => setMoveReq(req)}>Accept &amp; move mine</Btn>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <Btn full onClick={() => setMoveReq(req)}>Accept & move</Btn>
+                          <Btn full onClick={() => { if (window.confirm('Accept and cancel your event in this slot?')) accept(req.id, { mode: 'cancel' }).catch(() => snack('Failed')) }}>Accept &amp; cancel</Btn>
                           <Btn full variant="ghost" onClick={() => act(req.id, 'decline')}>Decline</Btn>
                         </div>
                       </div>
@@ -98,8 +98,10 @@ function MoveDayPicker({ req, onClose, onConfirm }) {
   const load = useCallback(() => {
     setEvents(null)
     api.get('/events/calendar', { params: { start: startOfDay(day).toISOString(), end: endOfDay(day).toISOString() } })
-      .then(r => setEvents(r.data)).catch(() => setEvents([]))
-  }, [day])
+      // hide the holder's OWN event being moved — showing it in the grid is confusing
+      .then(r => setEvents((r.data || []).filter(e => e.id !== req.event_id)))
+      .catch(() => setEvents([]))
+  }, [day, req.event_id])
   useEffect(() => { load() }, [load])
 
   const submit = async (s, e) => {

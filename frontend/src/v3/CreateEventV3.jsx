@@ -229,7 +229,9 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
         )}
 
         {error && <p className="m-error">{error}</p>}
-        <Btn variant="primary" full loading={loading} onClick={submit}>Create event</Btn>
+        <Btn variant="primary" full loading={loading} disabled={venueClashes.length > 0} onClick={submit}>
+          {venueClashes.length > 0 ? 'Room taken — request it above' : 'Create event'}
+        </Btn>
       </div>
     </SheetV3>
   )

@@ -71,6 +71,7 @@ class ReleaseRequestOut(BaseModel):
     holder_name: Optional[str] = None
     resource_name: Optional[str] = None
     event_title: Optional[str] = None
+    event_id: Optional[str] = None        # the holder's event (so the UI can hide it in the move picker)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
@@ -95,6 +96,7 @@ class ReleaseService:
             holder_name=req.holder.full_name if req.holder else None,
             resource_name=b.resource.name if b and b.resource else None,
             event_title=b.event.title if b and b.event else None,
+            event_id=b.event_id if b else None,
             start_time=b.start_time if b else None,
             end_time=b.end_time if b else None,
         )
