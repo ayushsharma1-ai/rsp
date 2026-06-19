@@ -2,20 +2,20 @@
 // The labels are fixed; we map them to actual /resources and /groups by name so
 // bookings + clash detection still work against the live API.
 
-// Deep, contrast-safe palette: white text is always readable on these, in both
-// light and dark mode (each clears WCAG AA on white text).
+// Room colours — muted, warm-leaning tones tuned to the graphite & amber theme
+// (distinct from the event-kind colours; readableOn() keeps text legible on each).
 export const VENUES = [
-  { key: '601H-N', label: '601H-N', sub: 'Computer room', color: '#4f46e5', online: false },
-  { key: '601H-O', label: '601H-O', sub: 'Classroom', color: '#15803d', online: false },
-  { key: '601H-P', label: '601H-P', sub: 'Classroom', color: '#c2410c', online: false },
-  { key: 'online', label: 'Online', sub: 'Add a meeting link', color: '#7c3aed', online: true },
+  { key: '601H-N', label: '601H-N', sub: 'Computer room', color: '#5f7aa6', online: false },
+  { key: '601H-O', label: '601H-O', sub: 'Classroom', color: '#7c8c54', online: false },
+  { key: '601H-P', label: '601H-P', sub: 'Classroom', color: '#8a6f9c', online: false },
+  { key: 'online', label: 'Online', sub: 'Add a meeting link', color: '#9c7b59', online: true },
 ]
 
-// Preset swatches for custom event color-coding (null = auto / venue color).
-// All deep enough that white event-text stays readable in both themes.
+// Cohesive category palette for the graphite & amber theme — muted, mid-tone,
+// readable in both light and dark.
 export const EVENT_COLORS = [
-  '#4f46e5', '#15803d', '#c2410c', '#7c3aed',
-  '#dc2626', '#0369a1', '#db2777', '#0f766e',
+  '#d99a4e', '#c06a43', '#7c8c54', '#4f8a80',
+  '#5f7aa6', '#8a6f9c', '#9c7b59', '#b0894a',
 ]
 
 export const GROUPS = [
@@ -46,10 +46,10 @@ export function groupIdForLabel(label, groups) {
 
 // Color used for an event, looked up from its venue/resource name.
 export function venueColorForName(resourceName) {
-  if (!resourceName) return '#7c3aed' // online / unspecified
+  if (!resourceName) return '#9c7b59' // online / unspecified (warm taupe)
   const n = norm(resourceName)
   const v = VENUES.find(x => !x.online && n.includes(norm(x.key)))
-  return v ? v.color : '#475569'      // other / unmatched
+  return v ? v.color : '#8a8276'      // other / unmatched (warm gray)
 }
 
 // Pick black or white text for a given background so it's always readable —

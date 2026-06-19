@@ -8,6 +8,20 @@ import { haptic } from '../mobile/theme'
 import SheetV3 from './SheetV3'
 import { VENUES, GROUPS, resourceForVenue, groupIdForLabel } from './config'
 
+// The TIME_SLOTS value `steps` half-hours after `value` (clamped to the last slot).
+const slotAfter = (value, steps) => {
+  const i = TIME_SLOTS.findIndex(s => s.value === value)
+  return TIME_SLOTS[Math.min((i < 0 ? 0 : i) + steps, TIME_SLOTS.length - 1)].value
+}
+// Earliest slot that isn't in the past for `date`: today → round now up to :00/:30; otherwise 09:00.
+const futureDefaultStart = (date) => {
+  const now = new Date()
+  if (format(now, 'yyyy-MM-dd') !== date) return '09:00'
+  const mins = Math.ceil((now.getHours() * 60 + now.getMinutes() + 1) / 30) * 30
+  const v = `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
+  return TIME_SLOTS.find(s => s.value === v) ? v : TIME_SLOTS[TIME_SLOTS.length - 1].value
+}
+
 // Google-Calendar-style create: opened from a tapped/selected slot (date + time
 // fixed from the calendar box). Field order: Title → Venue → Groups → Kind.
 // Event colour comes from the chosen KIND (no per-event colour picker).
@@ -32,10 +46,12 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
 
   useEffect(() => {
     if (!open) return
-    const s = start || '09:00'
-    const sIdx = TIME_SLOTS.findIndex(x => x.value === s)
+    const floor = futureDefaultStart(date)
+    let s = start || floor
+    if (s < floor) s = floor                              // never default into the past
+    const e = (end && end > s) ? end : slotAfter(s, 2)    // default 1h, always after start
     setTitle(''); setVenue('601H-N'); setLink(''); setGroups([])
-    setStartT(s); setEndT(end || TIME_SLOTS[Math.min(sIdx + 2, TIME_SLOTS.length - 1)]?.value || '10:00')
+    setStartT(s); setEndT(e)
     setError(''); setClashes([]); setRequested({})
     api.get('/resources').then(r => setResources(r.data)).catch(() => {})
     api.get('/groups').then(r => setRealGroups(r.data)).catch(() => {})
@@ -43,7 +59,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
       setKinds(r.data)
       setKindId(prev => prev || r.data[0]?.id || null)
     }).catch(() => {})
-  }, [open, start, end])
+  }, [open, start, end, date])
 
   const venueObj = VENUES.find(v => v.key === venue)
   const isOnline = !!venueObj?.online
@@ -111,8 +127,17 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     } finally { setLoading(false) }
   }
 
+  const isTodayDate = format(new Date(), 'yyyy-MM-dd') === date
+  const startSlots = isTodayDate ? TIME_SLOTS.filter(s => s.value >= futureDefaultStart(date)) : TIME_SLOTS
   const endSlots = TIME_SLOTS.filter(s => s.value > startT)
   const labelFor = (v) => TIME_SLOTS.find(s => s.value === v)?.label || v
+  // Changing the start shifts the end to keep the same duration, so the header
+  // text, the end dropdown, and state never disagree (end always stays after start).
+  const changeStart = (v) => {
+    const dur = Math.max(1, TIME_SLOTS.findIndex(x => x.value === endT) - TIME_SLOTS.findIndex(x => x.value === startT))
+    setStartT(v)
+    setEndT(slotAfter(v, dur))
+  }
 
   return (
     <SheetV3 open={open} onClose={onClose} title="New event">
@@ -126,8 +151,8 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select className="m-input" value={startT} onChange={e => setStartT(e.target.value)}>
-            {TIME_SLOTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <select className="m-input" value={startT} onChange={e => changeStart(e.target.value)}>
+            {startSlots.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
           <span style={{ color: 'var(--text-2)' }}>→</span>
           <select className="m-input" value={endT} onChange={e => setEndT(e.target.value)}>

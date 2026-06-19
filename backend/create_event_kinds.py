@@ -18,9 +18,9 @@ from app.modules import models  # noqa: F401 — registers all models on Base
 from app.modules.models import EventKind
 
 SEED = [
-    ("Class", "#4f46e5"),     # indigo
-    ("Workshop", "#15803d"),  # green
-    ("Talk", "#c2410c"),      # orange
+    ("Class", "#d99a4e"),     # amber / gold (matches the accent)
+    ("Workshop", "#4f8a80"),  # muted teal
+    ("Talk", "#c06a43"),      # terracotta
 ]
 
 
@@ -38,7 +38,10 @@ def main():
     db = SessionLocal()
     try:
         for name, color in SEED:
-            if not db.query(EventKind).filter(EventKind.name == name).first():
+            k = db.query(EventKind).filter(EventKind.name == name).first()
+            if k:
+                k.color = color          # refresh colour to match the current theme
+            else:
                 db.add(EventKind(name=name, color=color))
         db.commit()
         kinds = db.query(EventKind).order_by(EventKind.name).all()

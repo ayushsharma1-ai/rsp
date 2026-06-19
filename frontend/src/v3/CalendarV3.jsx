@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import {
   format, startOfMonth, startOfWeek, addMonths, addWeeks, addDays,
   startOfDay, endOfDay, isSameDay, isSameMonth, parseISO,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, CalendarPlus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, CalendarPlus, X } from 'lucide-react'
 import api from '../lib/api'
 import { addToCalendar } from '../lib/ics'
 import { useAuthStore } from '../store/authStore'
@@ -16,6 +17,7 @@ import { useAutoRefresh } from './useAutoRefresh'
 import CreateEventV3 from './CreateEventV3'
 import SheetV3 from './SheetV3'
 import DayGrid from './DayGrid'
+import { useBackClose } from './useBackClose'
 import { DAY_START, DAY_END, WK_PX, evMins, scrollToHour } from './dayConsts'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -26,7 +28,7 @@ const venueKeyForName = (name) => {
   const v = VENUES.find(x => !x.online && n.includes(x.key.toLowerCase().replace(/0/g, 'o').replace(/[^a-z0-9]/g, '')))
   return v ? v.key : 'other'
 }
-const colorByVenueKey = (key) => (VENUES.find(v => v.key === key)?.color) || '#64748b'
+const colorByVenueKey = (key) => (VENUES.find(v => v.key === key)?.color) || '#8a8276'
 
 export function CalendarV3() {
   const { user } = useAuthStore()
@@ -134,21 +136,25 @@ export function CalendarV3() {
 
   return (
     <div>
-      <div className="v-cal-head">
-        <div className="v-cal-title">{title}</div>
-        <div className="v-seg">
-          <button className={view === 'week' ? 'v-seg--active' : ''} onClick={() => setView('week')}>Week</button>
-          <button className={view === 'month' ? 'v-seg--active' : ''} onClick={() => setView('month')}>Month</button>
-        </div>
-      </div>
+      {view !== 'day' && (
+        <>
+          <div className="v-cal-head">
+            <div className="v-cal-title">{title}</div>
+            <div className="v-seg">
+              <button className={view === 'week' ? 'v-seg--active' : ''} onClick={() => setView('week')}>Week</button>
+              <button className={view === 'month' ? 'v-seg--active' : ''} onClick={() => setView('month')}>Month</button>
+            </div>
+          </div>
 
-      <div className="v-navrow" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <button className="v-iconbtn" onClick={stepBack}><ChevronLeft size={18} /></button>
-        <button className="m-chip" onClick={() => setCursor(today)}>Today</button>
-        <button className="v-iconbtn" onClick={stepFwd}><ChevronRight size={18} /></button>
-      </div>
+          <div className="v-navrow" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+            <button className="v-iconbtn" onClick={stepBack} aria-label="Previous"><ChevronLeft size={18} /></button>
+            <button className="m-chip" onClick={() => setCursor(today)}>Today</button>
+            <button className="v-iconbtn" onClick={stepFwd} aria-label="Next"><ChevronRight size={18} /></button>
+          </div>
+        </>
+      )}
 
-      {view !== 'week' && (
+      {view === 'month' && (
         <div className="v-filters">
           {VENUES.map(v => {
             const on = active.has(v.key)
@@ -164,6 +170,7 @@ export function CalendarV3() {
       {view === 'month' && <MonthView cursor={cursor} today={today} events={visible} eventColor={eventColor} onPick={goDay} />}
       {view === 'week' && <WeekView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onPickDay={goDay} onEvent={openDetail} onPrev={stepBack} onNext={stepFwd} />}
       {view === 'day' && <DayView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onBack={backFromDay} creating={!!create}
+        onPrev={stepBack} onNext={stepFwd} onToday={() => setCursor(today)}
         onEvent={openDetail} onCreate={(start, end) => setCreate({ date: format(cursor, 'yyyy-MM-dd'), start, end })} />}
 
       <button className="v-fab" aria-label="New event" onClick={() => { haptic(); if (view !== 'day') goDay(cursor); else setCreate({ date: format(cursor, 'yyyy-MM-dd'), start: '09:00', end: '10:00' }) }}><Plus size={24} /></button>
@@ -290,18 +297,30 @@ function WeekView({ cursor, today, events, eventColor, loading, onPickDay, onEve
   )
 }
 
-function DayView({ cursor, today, events, eventColor, loading, onBack, creating, onEvent, onCreate }) {
+function DayView({ cursor, today, events, eventColor, loading, onBack, onPrev, onNext, onToday, creating, onEvent, onCreate }) {
   const isToday = isSameDay(cursor, today)
   return (
     <div>
-      <div className="v-dayhead">
-        <button className="v-iconbtn" style={{ width: 34, height: 34, alignSelf: 'center' }} onClick={() => { haptic(); onBack() }} aria-label="Back to week">
-          <ChevronLeft size={18} />
+      {/* Row 1 — clearly-labelled Back (returns to week/month) + Today */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <button className="v-iconbtn" style={{ width: 'auto', padding: '0 12px', gap: 6 }} onClick={() => { haptic(); onBack() }} aria-label="Back to calendar">
+          <ChevronLeft size={18} /><span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Back</span>
         </button>
-        <span className={`v-dayhead__num ${isToday ? 'v-dayhead__num--today' : ''}`}>{format(cursor, 'd')}</span>
-        <span style={{ fontWeight: 600 }}>{format(cursor, 'EEEE')}</span>
-        {loading && <span className="m-spin" style={{ marginLeft: 'auto' }} />}
+        <div style={{ flex: 1 }} />
+        {loading && <span className="m-spin" />}
+        {!isToday && <button className="m-chip" onClick={() => { haptic(); onToday() }}>Today</button>}
       </div>
+
+      {/* Row 2 — day stepper: prev / next flank the date so their job is obvious */}
+      <div className="v-dayhead" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+        <button className="v-iconbtn" onClick={() => { haptic(); onPrev() }} aria-label="Previous day"><ChevronLeft size={18} /></button>
+        <div style={{ textAlign: 'center', minWidth: 0 }}>
+          <span className={`v-dayhead__num ${isToday ? 'v-dayhead__num--today' : ''}`} style={{ fontSize: '1.2rem' }}>{format(cursor, 'd')}</span>
+          <span style={{ fontWeight: 600, marginLeft: 6 }}>{format(cursor, 'EEEE')}</span>
+        </div>
+        <button className="v-iconbtn" onClick={() => { haptic(); onNext() }} aria-label="Next day"><ChevronRight size={18} /></button>
+      </div>
+
       <DayGrid cursor={cursor} today={today} events={events} eventColor={eventColor}
         confirmLabel="Add event" sheetOpen={creating} onEventTap={onEvent}
         onConfirm={(s, e) => onCreate(s, e)} />
@@ -320,11 +339,13 @@ function EditSheet({ event, onClose, onDone, snack }) {
   const [error, setError] = useState('')
   const [venues, setVenues] = useState(null)
   const [sent, setSent] = useState({})
+  const [picking, setPicking] = useState(false)
 
   useEffect(() => {
     if (event) {
       setTitle(event.title || '')
       setKindId(event.event_kind_id || null)
+      setPicking(false)
       setDate(format(parseISO(event.blockStart || event.start_time), 'yyyy-MM-dd'))
       setStart(format(parseISO(event.blockStart || event.start_time), 'HH:mm'))
       setEnd(format(parseISO(event.blockEnd || event.end_time), 'HH:mm'))
@@ -360,20 +381,27 @@ function EditSheet({ event, onClose, onDone, snack }) {
       setSent(s => ({ ...s, [vb.booking_id]: true })); snack('Request sent')
     } catch { snack('Could not send request') }
   }
-  const endSlots = TIME_SLOTS.filter(s => s.value > start)
+  const labelOf = (v) => TIME_SLOTS.find(s => s.value === v)?.label || v
 
   return (
+    <>
+    {picking && <EditTimePicker event={event} date={date}
+      onClose={() => setPicking(false)}
+      onPick={(d, s, e) => { setDate(d); setStart(s); setEnd(e); setPicking(false) }} />}
     <SheetV3 open={!!event} onClose={onClose} title="Edit event">
       <div style={{ display: 'grid', gap: 12 }}>
         <div><label className="m-label">Title</label>
           <input className="m-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Event title" /></div>
-        <div><label className="m-label">Date & time</label>
-          <input className="m-input" type="date" value={date} onChange={e => setDate(e.target.value)} style={{ marginBottom: 8 }} />
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select className="m-input" value={start} onChange={e => setStart(e.target.value)}>{TIME_SLOTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
-            <span style={{ color: 'var(--text-2)' }}>→</span>
-            <select className="m-input" value={end} onChange={e => setEnd(e.target.value)}>{endSlots.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
-          </div>
+        <div><label className="m-label">When</label>
+          <button type="button" onClick={() => setPicking(true)}
+            style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 14px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ fontWeight: 600, display: 'block' }}>{date ? format(parseISO(`${date}T00:00`), 'EEE, MMM d') : '—'}</span>
+              <span className="m-muted" style={{ fontSize: '0.84rem' }}>{labelOf(start)} – {labelOf(end)}</span>
+            </span>
+            <span className="m-muted" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.84rem', flex: '0 0 auto' }}>Change<ChevronRight size={16} /></span>
+          </button>
+          <div className="m-muted" style={{ fontSize: '0.76rem', marginTop: 6, marginLeft: 2 }}>Opens the day so you can see other events and avoid clashes.</div>
         </div>
         <div><label className="m-label">Kind</label>
           {kinds.length === 0
@@ -403,5 +431,49 @@ function EditSheet({ event, onClose, onDone, snack }) {
         {!venues && <Btn variant="primary" full loading={loading} onClick={save}>Save changes</Btn>}
       </div>
     </SheetV3>
+    </>
+  )
+}
+
+// Full-screen day calendar for rescheduling — shows the day's other events and a
+// live clash warning (from DayGrid) so you can drop the event into a free slot.
+// The event being edited is hidden so it doesn't flag itself as a conflict.
+function EditTimePicker({ event, date, onClose, onPick }) {
+  const [day, setDay] = useState(() => startOfDay(parseISO(`${date}T00:00`)))
+  const [events, setEvents] = useState(null)
+
+  const load = useCallback(() => {
+    setEvents(null)
+    api.get('/events/calendar', { params: { start: startOfDay(day).toISOString(), end: endOfDay(day).toISOString() } })
+      .then(r => setEvents((r.data || []).filter(e => e.id !== event.id)))
+      .catch(() => setEvents([]))
+  }, [day, event.id])
+  useEffect(() => { load() }, [load])
+  useBackClose(true, onClose)
+
+  return ReactDOM.createPortal(
+    <div className="v-moveoverlay" style={{ zIndex: 1100 }}>
+      <div className="v-moveoverlay__head">
+        <button className="v-iconbtn" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+          <div style={{ fontWeight: 700 }}>Pick a new time</div>
+          <div className="m-muted" style={{ fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.title}</div>
+        </div>
+        <div style={{ width: 40, flex: '0 0 40px' }} />
+      </div>
+
+      <div className="v-moveoverlay__nav">
+        <button className="v-iconbtn" onClick={() => setDay(d => addDays(d, -1))} aria-label="Previous day"><ChevronLeft size={18} /></button>
+        <span style={{ fontWeight: 700 }}>{format(day, 'EEE, MMM d')}</span>
+        <button className="v-iconbtn" onClick={() => setDay(d => addDays(d, 1))} aria-label="Next day"><ChevronRight size={18} /></button>
+      </div>
+
+      <div className="v-moveoverlay__body">
+        <DayGrid cursor={day} today={new Date()} events={events || []}
+          eventColor={(e) => e.kind_color || e.color || '#8a8276'} confirmLabel="Use this time"
+          onConfirm={(s, e) => onPick(format(day, 'yyyy-MM-dd'), s, e)} />
+      </div>
+    </div>,
+    document.body,
   )
 }
