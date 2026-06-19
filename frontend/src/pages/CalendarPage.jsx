@@ -39,6 +39,16 @@ function getColor(id) {
   return EVENT_COLORS[Math.abs(h) % EVENT_COLORS.length]
 }
 
+// Event colour now comes from its KIND (Class/Workshop/Talk). Build the
+// translucent-bg / solid-border / coloured-text triple from the kind's hex;
+// fall back to the id-hash palette for events with no kind.
+function colorForEvent(evt) {
+  if (evt.kind_color) {
+    return { bg: `${evt.kind_color}22`, border: evt.kind_color, text: evt.kind_color }
+  }
+  return getColor(evt.id)
+}
+
 export default function CalendarPage() {
   const { user }  = useAuthStore()
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
@@ -502,7 +512,7 @@ export default function CalendarPage() {
                   const endDt        = parseISO(evt.end)
                   const topPx        = (startDt.getHours() - HOUR_START + startDt.getMinutes() / 60) * CELL_HEIGHT
                   const heightPx     = Math.max(28, ((endDt - startDt) / 3600000) * CELL_HEIGHT)
-                  const color        = getColor(evt.id)
+                  const color        = colorForEvent(evt)
                   const isCancelled  = evt.status === 'cancelled'
                   const isSavingThis = saving === evt.key
 

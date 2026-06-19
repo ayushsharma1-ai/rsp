@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.database import Base, engine
 from app.core.limiter import limiter          # ← from core, not main
 from app.modules import models                # noqa
-from app.api.v1.routes import auth, resources, bookings, users, feedback, availability, groups, clash, release
+from app.api.v1.routes import auth, resources, bookings, users, feedback, availability, groups, clash, release, event_kinds
 from app.modules.notifications.service import register_handlers
 from app.modules.email.service import register_email_handlers
 
@@ -55,6 +55,7 @@ app.include_router(availability.router, prefix="/api/v1")
 app.include_router(groups.router,       prefix="/api/v1")
 app.include_router(clash.router,        prefix="/api/v1")
 app.include_router(release.router,      prefix="/api/v1")
+app.include_router(event_kinds.router,  prefix="/api/v1")
 
 @app.get("/health")
 def health():

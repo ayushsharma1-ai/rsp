@@ -159,6 +159,22 @@ class EventCategory(str, enum.Enum):
     ADHOC = "adhoc"         # new one-off events people create
 
 
+class EventKind(Base):
+    """
+    A user-facing TYPE of event (Class, Workshop, Talk, …) with a display colour.
+    The event's calendar colour is derived from its kind — there is no per-event
+    colour picker. Kinds are ADMIN-managed (seeded + added via the API by an admin);
+    a regular logged-in user can only PICK an existing kind when creating an event.
+    Stored as data (not an enum) so new kinds can be added without a migration.
+    """
+    __tablename__ = "event_kinds"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    name = Column(String(80), unique=True, nullable=False)
+    color = Column(String(9), nullable=False)   # hex, e.g. "#4f46e5"
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
 class Event(Base):
     """
     An Event is WHAT is happening — a meeting, lecture, seminar.
@@ -194,7 +210,8 @@ class Event(Base):
     is_public = Column(Boolean, default=True, nullable=False)
     is_recurring_root = Column(Boolean, default=False, nullable=False)
     category = Column(SAEnum(EventCategory), default=EventCategory.ADHOC, nullable=False)
-    color = Column(String(9), nullable=True)  # optional user-chosen hex (e.g. "#5b6ef5"); null = default venue color
+    color = Column(String(9), nullable=True)  # legacy per-event hex; superseded by event_kind colour
+    event_kind_id = Column(UUID(as_uuid=False), ForeignKey("event_kinds.id"), nullable=True)  # colour source
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -204,6 +221,7 @@ class Event(Base):
     bookings = relationship("Booking", back_populates="event", cascade="all, delete-orphan")
     participants = relationship("EventParticipant", back_populates="event", cascade="all, delete-orphan")
     parent_event = relationship("Event", remote_side="Event.id", foreign_keys=[parent_event_id])
+    event_kind = relationship("EventKind")
 
     __table_args__ = (
         Index("ix_events_organizer", "organizer_id"),

@@ -6,20 +6,20 @@ import { Btn, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
 import { haptic } from '../mobile/theme'
 import SheetV3 from './SheetV3'
-import { VENUES, GROUPS, EVENT_COLORS, resourceForVenue, groupIdForLabel } from './config'
+import { VENUES, GROUPS, resourceForVenue, groupIdForLabel } from './config'
 
 // Google-Calendar-style create: opened from a tapped/selected slot (date + time
-// fixed from the calendar box). Time stays editable here; to change the DATE you
-// go back to the calendar. Field order per spec: Title → Venue → Groups.
-// Restores the v2 live clash preview: student clash = hard block, venue clash =
-// one-tap release request.
+// fixed from the calendar box). Field order: Title → Venue → Groups → Kind.
+// Event colour comes from the chosen KIND (no per-event colour picker).
+// Venue clash = one-tap release request. (Student clash removed 2026-06-18.)
 export default function CreateEventV3({ open, onClose, onCreated, date, start, end }) {
   const snack = useSnack()
   const [title, setTitle] = useState('')
   const [venue, setVenue] = useState('601H-N')
   const [link, setLink] = useState('')
   const [groups, setGroups] = useState([])
-  const [color, setColor] = useState(null)         // null = auto (venue color)
+  const [kinds, setKinds] = useState([])
+  const [kindId, setKindId] = useState(null)        // chosen event type → drives colour
   const [startT, setStartT] = useState(start || '09:00')
   const [endT, setEndT] = useState(end || '10:00')
   const [resources, setResources] = useState([])
@@ -34,11 +34,15 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     if (!open) return
     const s = start || '09:00'
     const sIdx = TIME_SLOTS.findIndex(x => x.value === s)
-    setTitle(''); setVenue('601H-N'); setLink(''); setGroups([]); setColor(null)
+    setTitle(''); setVenue('601H-N'); setLink(''); setGroups([])
     setStartT(s); setEndT(end || TIME_SLOTS[Math.min(sIdx + 2, TIME_SLOTS.length - 1)]?.value || '10:00')
     setError(''); setClashes([]); setRequested({})
     api.get('/resources').then(r => setResources(r.data)).catch(() => {})
     api.get('/groups').then(r => setRealGroups(r.data)).catch(() => {})
+    api.get('/event-kinds').then(r => {
+      setKinds(r.data)
+      setKindId(prev => prev || r.data[0]?.id || null)
+    }).catch(() => {})
   }, [open, start, end])
 
   const venueObj = VENUES.find(v => v.key === venue)
@@ -46,7 +50,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
   const mappedResource = !isOnline ? resourceForVenue(venueObj, resources) : null
   const groupIds = groups.map(k => groupIdForLabel(GROUPS.find(g => g.key === k).label, realGroups)).filter(Boolean)
 
-  // live clash preview (venue + students)
+  // live clash preview (venue only)
   useEffect(() => {
     if (!open) return
     if (endT <= startT) { setClashes([]); return }
@@ -59,7 +63,8 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     return () => { cancelled = true }
   }, [open, date, startT, endT, venue, groups.join(','), resources.length, realGroups.length])
 
-  const hasStudentClash = clashes.some(c => c.student_clash)
+  // Only venue clashes matter now (student clashes are ignored).
+  const venueClashes = clashes.filter(c => c.venue_clash)
   const allGroupsOn = groups.length === GROUPS.length
   const toggleGroup = (k) => setGroups(g => g.includes(k) ? g.filter(x => x !== k) : [...g, k])
   const toggleAll = () => setGroups(allGroupsOn ? [] : GROUPS.map(g => g.key))
@@ -77,7 +82,6 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
         },
       })
       setRequested(p => ({ ...p, [vb.booking_id]: true }))
-      // clear, well-formatted confirmation, then close the create sheet
       const tl = (v) => TIME_SLOTS.find(s => s.value === v)?.label || v
       const dayLabel = format(new Date(`${date}T00:00`), 'EEE, MMM d')
       snack(`Request sent to ${vb.holder_name} — ${vb.resource_name}, ${dayLabel} · ${tl(startT)}–${tl(endT)}`)
@@ -94,13 +98,12 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     if (!title.trim()) { setError('Give the event a title.'); return }
     if (endT <= startT) { setError('End time must be after start time.'); return }
     if (isOnline && !link.trim()) { setError('Add a meeting link for the online event.'); return }
-    if (hasStudentClash) { setError('Students here are already booked elsewhere — pick another slot.'); return }
     setLoading(true)
     try {
       const startISO = toISO(date, startT), endISO = toISO(date, endT)
       const bookings = mappedResource ? [{ resource_id: mappedResource.id, start_time: startISO, end_time: endISO, notes: '' }] : []
       const description = isOnline ? `Online meeting: ${link.trim()}` : ''
-      await api.post('/events', { title: title.trim(), description, start_time: startISO, end_time: endISO, is_public: true, bookings, group_ids: groupIds, category: 'adhoc', color })
+      await api.post('/events', { title: title.trim(), description, start_time: startISO, end_time: endISO, is_public: true, bookings, group_ids: groupIds, category: 'adhoc', event_kind_id: kindId })
       haptic(12); snack('Event created'); onCreated && onCreated()
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not create — that slot may be busy.')
@@ -163,27 +166,27 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
         </div>
 
         <div>
-          <label className="m-label">Color</label>
-          <div className="v-swatches">
-            <button type="button" className={`v-swatch v-swatch--auto ${color === null ? 'v-swatch--on' : ''}`}
-              onClick={() => { haptic(); setColor(null) }} title="Auto (venue color)">A</button>
-            {EVENT_COLORS.map(c => (
-              <button key={c} type="button" className={`v-swatch ${color === c ? 'v-swatch--on' : ''}`}
-                style={{ background: c }} onClick={() => { haptic(); setColor(c) }} />
-            ))}
-          </div>
+          <label className="m-label">Kind</label>
+          {kinds.length === 0
+            ? <div className="m-muted" style={{ fontSize: '0.85rem' }}>No event kinds defined yet.</div>
+            : <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
+                {kinds.map(k => (
+                  <button key={k.id} type="button" className={`m-chip ${kindId === k.id ? 'm-chip--active' : ''}`}
+                    onClick={() => { haptic(); setKindId(k.id) }}>
+                    <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: k.color, marginRight: 6, verticalAlign: 'middle' }} />
+                    {k.name}
+                  </button>
+                ))}
+              </div>}
         </div>
 
-        {clashes.length > 0 && (
+        {venueClashes.length > 0 && (
           <div className="v-clash">
-            <div className="v-clash__head"><AlertTriangle size={16} /> Scheduling conflict</div>
-            {clashes.map(c => (
+            <div className="v-clash__head"><AlertTriangle size={16} /> Room already booked</div>
+            {venueClashes.map(c => (
               <div key={c.event_id} className="v-clash__item">
                 <div className="v-clash__name">{c.title}</div>
-                <div className="v-clash__tags">
-                  {c.venue_clash && <span className="v-clash__tag">Same room</span>}
-                  {c.student_clash && <span className="v-clash__tag v-clash__tag--block">{c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
-                </div>
+                <div className="v-clash__tags"><span className="v-clash__tag">Same room</span></div>
                 {(c.venue_bookings || []).map(vb => (
                   <div key={vb.booking_id} className="v-clash__row">
                     <span className="v-clash__room">{vb.resource_name} · held by <strong>{vb.holder_name}</strong></span>
@@ -196,12 +199,11 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
                 ))}
               </div>
             ))}
-            {hasStudentClash && <div className="v-clash__block">Students here are already booked at this time — this slot can’t be booked. Pick another time.</div>}
           </div>
         )}
 
         {error && <p className="m-error">{error}</p>}
-        <Btn variant="primary" full loading={loading} disabled={hasStudentClash} onClick={submit}>Create event</Btn>
+        <Btn variant="primary" full loading={loading} onClick={submit}>Create event</Btn>
       </div>
     </SheetV3>
   )

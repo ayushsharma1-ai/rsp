@@ -19,11 +19,18 @@ from app.core.recurrence import check_recurring_conflict, expand_rrule
 
 from app.modules.models import (
     Booking, BookingStatus, Resource, Event, User, AuditLog,
-    Notification, NotificationType, EventStatus, EventGroup, EventCategory
+    Notification, NotificationType, EventStatus, EventGroup, EventCategory, EventKind
 )
 from app.core.events import bus
 from app.modules.availability.service import AvailabilityService
 from app.modules.clash.service import ClashService
+
+
+# Master switch for the STUDENT-clash hard block. Turned OFF (2026-06-18) at the
+# user's request — student clashes are no longer detected/blocked anywhere. The
+# venue-clash + release-request flow is unaffected. Flip back to True to re-enable
+# the student-clash block at create + edit (no other change needed).
+STUDENT_CLASH_ENABLED = False
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────
@@ -55,7 +62,8 @@ class EventCreate(BaseModel):
     bookings: List[BookingCreate] = []
     group_ids: List[str] = []          # Phase 2: cohorts/groups this event is for
     category: str = "adhoc"            # Phase 5: 'academic' or 'adhoc'
-    color: Optional[str] = None        # v3: optional user-chosen hex color
+    color: Optional[str] = None        # legacy per-event hex (superseded by event_kind)
+    event_kind_id: Optional[str] = None  # the chosen event type — drives the calendar colour
 
 
 class EventOut(BaseModel):
@@ -121,7 +129,7 @@ class BookingService:
 
         # Hard block on STUDENT clash (policy 2026-06-10): if this event's groups share any
         # students with another event at the same time, refuse it — pick a different slot.
-        if data.group_ids:
+        if STUDENT_CLASH_ENABLED and data.group_ids:
             resource_ids = [b.resource_id for b in data.bookings]
             for c in ClashService(self.db).find_clashes(
                 data.start_time, data.end_time, data.group_ids, resource_ids):
@@ -142,6 +150,7 @@ class BookingService:
             status=EventStatus.CONFIRMED,
             category=EventCategory(data.category) if data.category in ("academic", "adhoc") else EventCategory.ADHOC,
             color=data.color,
+            event_kind_id=data.event_kind_id,
         )
         self.db.add(event)
         self.db.flush()  # get event.id without committing
@@ -847,7 +856,7 @@ def _update_booking(self, booking_id: str, data: 'BookingUpdate', actor: 'User')
         # Hard block on STUDENT clash when moving the booking (policy 2026-06-10)
         group_ids = [eg.group_id for eg in
                      self.db.query(EventGroup).filter(EventGroup.event_id == booking.event_id).all()]
-        if group_ids:
+        if STUDENT_CLASH_ENABLED and group_ids:
             for c in ClashService(self.db).find_clashes(
                     new_start, new_end, group_ids, [booking.resource_id],
                     exclude_event_id=booking.event_id):
@@ -882,7 +891,8 @@ class EventUpdate(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    color: Optional[str] = None        # v3: optional user-chosen hex color
+    color: Optional[str] = None          # legacy per-event hex (superseded by event_kind)
+    event_kind_id: Optional[str] = None  # change the event's type/colour
 
 
 def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occurrence_date: datetime = None) -> dict:
@@ -941,6 +951,7 @@ def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occur
         if data.title:           event.title         = data.title
         if data.description is not None: event.description = data.description
         if data.color is not None:       event.color       = data.color or None
+        if data.event_kind_id is not None: event.event_kind_id = data.event_kind_id or None
 
         # Cascade to template booking
         for booking in event.bookings:
@@ -985,7 +996,7 @@ def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occur
             # Hard block on STUDENT clash when moving the event (policy 2026-06-10)
             group_ids = [eg.group_id for eg in
                          self.db.query(EventGroup).filter(EventGroup.event_id == event.id).all()]
-            if group_ids:
+            if STUDENT_CLASH_ENABLED and group_ids:
                 resource_ids = [b.resource_id for b in event.bookings
                                 if b.status not in (BookingStatus.CANCELLED, BookingStatus.REJECTED)]
                 for c in ClashService(self.db).find_clashes(
@@ -1003,6 +1014,7 @@ def _update_event(self, event_id: str, data: 'EventUpdate', actor: 'User', occur
         if data.title:           event.title         = data.title
         if data.description is not None: event.description = data.description
         if data.color is not None:       event.color       = data.color or None
+        if data.event_kind_id is not None: event.event_kind_id = data.event_kind_id or None
 
         for booking in event.bookings:
             if booking.status not in (BookingStatus.CANCELLED, BookingStatus.REJECTED):
@@ -1193,6 +1205,9 @@ def _get_event_detail(self, event_id: str, actor: 'User') -> dict:
         "organizer_name": organizer.full_name if organizer else "Unknown",
         "is_mine":      event.organizer_id == actor.id,
         "color":        event.color,
+        "event_kind_id": event.event_kind_id,
+        "kind_name":    event.event_kind.name if event.event_kind else None,
+        "kind_color":   event.event_kind.color if event.event_kind else None,
         "bookings":     bookings,
     }
 
@@ -1264,6 +1279,8 @@ def _get_calendar_events(self, actor, start, end):
             "description":      e.description,
             "is_public":        e.is_public,
             "color":            e.color,
+            "kind_name":        e.event_kind.name if e.event_kind else None,
+            "kind_color":       e.event_kind.color if e.event_kind else None,
             "is_recurring":     False,
             "is_exception":     False,
         })
@@ -1359,6 +1376,8 @@ def _get_calendar_events(self, actor, start, end):
                     "description":      exception.description,
                     "is_public":        root_event.is_public,
                     "color":            exception.color or root_event.color,
+                    "kind_name":        root_event.event_kind.name if root_event.event_kind else None,
+                    "kind_color":       root_event.event_kind.color if root_event.event_kind else None,
                     "is_recurring":     True,
                     "is_exception":     True,
                     "original_time":    occ_start,
@@ -1382,6 +1401,8 @@ def _get_calendar_events(self, actor, start, end):
                     "description":      root_event.description,
                     "is_public":        root_event.is_public,
                     "color":            root_event.color,
+                    "kind_name":        root_event.event_kind.name if root_event.event_kind else None,
+                    "kind_color":       root_event.event_kind.color if root_event.event_kind else None,
                     "is_recurring":     True,
                     "is_exception":     False,
                     "rrule":            rule.rrule,

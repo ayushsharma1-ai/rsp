@@ -243,11 +243,6 @@ function EditBookingModal({ booking: b, onClose, onSaved }) {
   const submit = async e => {
     e.preventDefault()
     setError('')
-    // Student clash is a hard block (policy) — stop before hitting the server.
-    if (clashes.some(c => c.student_clash)) {
-      setError('This time clashes with students already booked elsewhere — pick a different slot.')
-      return
-    }
     setLoading(true)
     try {
       const startISO = new Date(`${form.date}T${form.start_time}`).toISOString()
@@ -271,6 +266,8 @@ function EditBookingModal({ booking: b, onClose, onSaved }) {
   }
 
   const endSlots = TIME_SLOTS.filter(s => s.value > form.start_time)
+  // Only venue clashes are surfaced now (student clashes removed 2026-06-18).
+  const venueClashes = clashes.filter(c => c.venue_clash)
 
   return (
     <Modal open title="Edit Booking" onClose={onClose} width={480}>
@@ -314,17 +311,16 @@ function EditBookingModal({ booking: b, onClose, onSaved }) {
           />
         </Field>
 
-        {clashes.length > 0 && (
+        {venueClashes.length > 0 && (
           <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#7c2d12' }}>
             <strong style={{ color: '#c2410c' }}>
-              ⚠ New time clashes with {clashes.length} event{clashes.length > 1 ? 's' : ''}:
+              ⚠ New time clashes with {venueClashes.length} event{venueClashes.length > 1 ? 's' : ''}:
             </strong>
             <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.2rem' }}>
-              {clashes.map(c => (
+              {venueClashes.map(c => (
                 <li key={c.event_id}>
                   <strong>{c.title}</strong>
-                  {c.venue_clash && <span> · same room</span>}
-                  {c.student_clash && <span> · {c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
+                  <span> · same room</span>
                 </li>
               ))}
             </ul>

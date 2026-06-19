@@ -5,7 +5,7 @@ import { TIME_SLOTS, roundToNext30, localDate, localTime, toISO } from './lib'
 import { haptic } from './theme'
 
 // Reusable create-event bottom sheet — mirrors desktop CreateEventModal payloads.
-// Student clashes = hard block; venue clashes offer a one-tap release request.
+// Venue clashes offer a one-tap release request. (Student clash removed 2026-06-18.)
 export default function EventCreateSheet({ open, onClose, onCreated, defaultDate }) {
   const snack = useSnack()
   const now = new Date()
@@ -74,12 +74,11 @@ export default function EventCreateSheet({ open, onClose, onCreated, defaultDate
     } catch { snack('Could not send request') }
   }
 
-  const hasStudentClash = clashes.some(c => c.student_clash)
+  const venueClashes = clashes.filter(c => c.venue_clash)
 
   const submit = async () => {
     setError('')
     if (!form.title.trim()) { setError('Give the event a title.'); return }
-    if (hasStudentClash) { setError('Students here are already booked elsewhere — pick another slot.'); return }
     const start = toISO(form.date, form.start_time)
     const end = toISO(form.date, form.end_time)
     if (new Date(end) <= new Date(start)) { setError('End time must be after start time.'); return }
@@ -172,14 +171,13 @@ export default function EventCreateSheet({ open, onClose, onCreated, defaultDate
           </div>
         )}
 
-        {clashes.length > 0 && (
+        {venueClashes.length > 0 && (
           <div className="m-warn">
-            <strong>⚠ {clashes.length} possible clash{clashes.length > 1 ? 'es' : ''}</strong>
-            {clashes.map(c => (
+            <strong>⚠ {venueClashes.length} room clash{venueClashes.length > 1 ? 'es' : ''}</strong>
+            {venueClashes.map(c => (
               <div key={c.event_id} style={{ marginTop: 6 }}>
                 <div style={{ fontWeight: 600 }}>{c.title}
-                  {c.venue_clash && <span className="m-muted"> · same room</span>}
-                  {c.student_clash && <span style={{ color: 'var(--danger)' }}> · {c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
+                  <span className="m-muted"> · same room</span>
                 </div>
                 {(c.venue_bookings || []).map(vb => (
                   <div key={vb.booking_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 4, fontSize: '0.84rem' }}>
@@ -191,7 +189,6 @@ export default function EventCreateSheet({ open, onClose, onCreated, defaultDate
                 ))}
               </div>
             ))}
-            {hasStudentClash && <div style={{ color: 'var(--danger)', marginTop: 8, fontWeight: 600 }}>Student clash blocks booking.</div>}
           </div>
         )}
 
@@ -202,7 +199,7 @@ export default function EventCreateSheet({ open, onClose, onCreated, defaultDate
 
         {error && <p className="m-error">{error}</p>}
 
-        <Btn variant="primary" full loading={loading} disabled={hasStudentClash} onClick={submit}>Create event</Btn>
+        <Btn variant="primary" full loading={loading} onClick={submit}>Create event</Btn>
       </div>
     </BottomSheet>
   )

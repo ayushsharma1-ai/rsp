@@ -45,12 +45,14 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
     selectedResources: [],
     selectedGroups: [],
     category: 'adhoc',
+    event_kind_id: null,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [groups, setGroups] = useState([])
   const [clashes, setClashes] = useState([])
   const [requested, setRequested] = useState({})   // booking_id -> true once a release request is sent
+  const [kinds, setKinds] = useState([])           // event types (Class/Workshop/Talk) — drive colour
 
   // Reset form when modal opens
   useEffect(() => {
@@ -66,11 +68,16 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
         selectedResources: [],
         selectedGroups: [],
         category: 'adhoc',
+        event_kind_id: null,
       })
       setError('')
       setClashes([])
       setRequested({})
       api.get('/groups').then(r => setGroups(r.data)).catch(() => {})
+      api.get('/event-kinds').then(r => {
+        setKinds(r.data)
+        setForm(f => ({ ...f, event_kind_id: f.event_kind_id || r.data[0]?.id || null }))
+      }).catch(() => {})
     }
   }, [open])
 
@@ -135,11 +142,6 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
   const submit = async e => {
     e.preventDefault()
     setError('')
-    // Student clashes are a hard block (policy) — stop before hitting the server.
-    if (clashes.some(c => c.student_clash)) {
-      setError('This time clashes with students already booked elsewhere — pick a different slot.')
-      return
-    }
     setLoading(true)
     try {
       const startISO = new Date(`${form.date}T${form.start_time}`).toISOString()
@@ -169,6 +171,7 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
         bookings,
         group_ids: form.selectedGroups,
         category: form.category,
+        event_kind_id: form.event_kind_id,
       })
       onCreated()
     } catch (err) {
@@ -179,6 +182,8 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
   }
 
   const endSlots = TIME_SLOTS.filter(s => s.value > form.start_time)
+  // Only venue clashes are surfaced now (student clashes removed 2026-06-18).
+  const venueClashes = clashes.filter(c => c.venue_clash)
 
   return (
     <Modal open={open} onClose={onClose} title="Create New Event" width={560}>
@@ -214,6 +219,16 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
             <option value="adhoc">Ad-hoc event</option>
             <option value="academic">Academic / timetable</option>
           </select>
+        </Field>
+
+        <Field label="Kind">
+          {kinds.length === 0 ? (
+            <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>No event kinds defined yet.</span>
+          ) : (
+            <select value={form.event_kind_id || ''} onChange={set('event_kind_id')}>
+              {kinds.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          )}
         </Field>
 
         {/* Google-Calendar-style date + time picker */}
@@ -308,17 +323,16 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
           </div>
         </Field>
 
-        {clashes.length > 0 && (
+        {venueClashes.length > 0 && (
           <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#7c2d12' }}>
             <strong style={{ color: '#c2410c' }}>
-              ⚠ {clashes.length} possible clash{clashes.length > 1 ? 'es' : ''} at this time:
+              ⚠ {venueClashes.length} room clash{venueClashes.length > 1 ? 'es' : ''} at this time:
             </strong>
             <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.2rem' }}>
-              {clashes.map(c => (
+              {venueClashes.map(c => (
                 <li key={c.event_id}>
                   <strong>{c.title}</strong>
-                  {c.venue_clash && <span> · same room</span>}
-                  {c.student_clash && <span> · {c.shared_student_count} shared student{c.shared_student_count > 1 ? 's' : ''}</span>}
+                  <span> · same room</span>
                   {(c.venue_bookings || []).map(vb => (
                     <div key={vb.booking_id} style={{ marginTop: '0.2rem' }}>
                       Room <strong>{vb.resource_name}</strong> held by {vb.holder_name} —{' '}

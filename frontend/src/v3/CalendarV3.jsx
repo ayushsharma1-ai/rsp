@@ -11,7 +11,7 @@ import { useAuthStore } from '../store/authStore'
 import { Btn, DetailRow, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
 import { haptic } from '../mobile/theme'
-import { VENUES, EVENT_COLORS, venueColorForName, readableOn } from './config'
+import { VENUES, venueColorForName, readableOn } from './config'
 import { useAutoRefresh } from './useAutoRefresh'
 import CreateEventV3 from './CreateEventV3'
 import SheetV3 from './SheetV3'
@@ -101,7 +101,7 @@ export function CalendarV3() {
   }, [sp.get('event')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const eventVenue = (e) => venueKeyForName(venueByEvent[e.id])
-  const eventColor = (e) => e.color || venueColorForName(venueByEvent[e.id])
+  const eventColor = (e) => e.kind_color || e.color || venueColorForName(venueByEvent[e.id])
   const visible = (events || []).filter(e => active.has(eventVenue(e)))
   const toggleFilter = (key) => setActive(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
 
@@ -188,7 +188,7 @@ export function CalendarV3() {
                   start: sel.blockStart || sel.start_time, end: sel.blockEnd || sel.end_time,
                   location: (sel.bookings || []).map(b => b.resource_name).filter(Boolean).join(', '),
                 })
-                snack(how === 'android' ? 'Opening your calendar app…' : 'Calendar file ready — open it to add')
+                snack(how === 'android' ? 'Opening calendar… (if nothing opens, the file is in Downloads)' : 'Calendar file ready — open it to add')
               }}><CalendarPlus size={16} /> Add to my calendar</Btn>
               {canAct && (
                 <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
@@ -311,7 +311,8 @@ function DayView({ cursor, today, events, eventColor, loading, onBack, creating,
 
 function EditSheet({ event, onClose, onDone, snack }) {
   const [title, setTitle] = useState('')
-  const [color, setColor] = useState(null)
+  const [kinds, setKinds] = useState([])
+  const [kindId, setKindId] = useState(null)
   const [date, setDate] = useState('')
   const [start, setStart] = useState('09:00')
   const [end, setEnd] = useState('10:00')
@@ -323,11 +324,12 @@ function EditSheet({ event, onClose, onDone, snack }) {
   useEffect(() => {
     if (event) {
       setTitle(event.title || '')
-      setColor(event.color || null)
+      setKindId(event.event_kind_id || null)
       setDate(format(parseISO(event.blockStart || event.start_time), 'yyyy-MM-dd'))
       setStart(format(parseISO(event.blockStart || event.start_time), 'HH:mm'))
       setEnd(format(parseISO(event.blockEnd || event.end_time), 'HH:mm'))
       setError(''); setVenues(null); setSent({})
+      api.get('/event-kinds').then(r => setKinds(r.data)).catch(() => {})
     }
   }, [event])
   if (!event) return null
@@ -338,7 +340,7 @@ function EditSheet({ event, onClose, onDone, snack }) {
     setLoading(true); setError(''); setVenues(null)
     const ns = toISO(date, start), ne = toISO(date, end)
     try {
-      const payload = { title: title.trim(), color, start_time: ns, end_time: ne }
+      const payload = { title: title.trim(), event_kind_id: kindId, start_time: ns, end_time: ne }
       if (event.is_recurring) payload.occurrence_date = event.occurrenceDate
       await api.patch(`/events/${event.id}`, payload); snack('Event updated'); onDone()
     } catch (err) {
@@ -373,13 +375,18 @@ function EditSheet({ event, onClose, onDone, snack }) {
             <select className="m-input" value={end} onChange={e => setEnd(e.target.value)}>{endSlots.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
           </div>
         </div>
-        <div><label className="m-label">Color</label>
-          <div className="v-swatches">
-            <button type="button" className={`v-swatch v-swatch--auto ${color === null ? 'v-swatch--on' : ''}`} onClick={() => { haptic(); setColor(null) }} title="Auto">A</button>
-            {EVENT_COLORS.map(c => (
-              <button key={c} type="button" className={`v-swatch ${color === c ? 'v-swatch--on' : ''}`} style={{ background: c }} onClick={() => { haptic(); setColor(c) }} />
-            ))}
-          </div>
+        <div><label className="m-label">Kind</label>
+          {kinds.length === 0
+            ? <div className="m-muted" style={{ fontSize: '0.85rem' }}>No event kinds defined yet.</div>
+            : <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
+                {kinds.map(k => (
+                  <button key={k.id} type="button" className={`m-chip ${kindId === k.id ? 'm-chip--active' : ''}`}
+                    onClick={() => { haptic(); setKindId(k.id) }}>
+                    <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: k.color, marginRight: 6, verticalAlign: 'middle' }} />
+                    {k.name}
+                  </button>
+                ))}
+              </div>}
         </div>
         {venues && (
           <div className="m-warn">
