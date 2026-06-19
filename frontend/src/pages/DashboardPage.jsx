@@ -153,6 +153,12 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
         return
       }
 
+      if (new Date(startISO) < new Date()) {
+        setError("You can't create an event in the past")
+        setLoading(false)
+        return
+      }
+
       const bookings = form.selectedResources
         .filter(r => r.resource_id)
         .map(r => ({
@@ -239,6 +245,7 @@ export function CreateEventModal({ open, onClose, resources, onCreated }) {
               value={form.date}
               onChange={set('date')}
               className="datetime-date"
+              min={fmtLocal(new Date()).slice(0, 10)}
               required
             />
             <select value={form.start_time} onChange={set('start_time')} className="datetime-time">

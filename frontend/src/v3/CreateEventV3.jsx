@@ -97,6 +97,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     setError('')
     if (!title.trim()) { setError('Give the event a title.'); return }
     if (endT <= startT) { setError('End time must be after start time.'); return }
+    if (new Date(toISO(date, startT)) < new Date()) { setError("You can't create an event in the past."); return }
     if (isOnline && !link.trim()) { setError('Add a meeting link for the online event.'); return }
     setLoading(true)
     try {

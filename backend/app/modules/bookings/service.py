@@ -127,6 +127,12 @@ class BookingService:
         if data.end_time <= data.start_time:
             raise HTTPException(status_code=400, detail="end_time must be after start_time")
 
+        # Block creating events in the past — start must be now or later.
+        now = datetime.now(timezone.utc)
+        start = data.start_time if data.start_time.tzinfo else data.start_time.replace(tzinfo=timezone.utc)
+        if start < now:
+            raise HTTPException(status_code=400, detail="Cannot create an event in the past.")
+
         # Hard block on STUDENT clash (policy 2026-06-10): if this event's groups share any
         # students with another event at the same time, refuse it — pick a different slot.
         if STUDENT_CLASH_ENABLED and data.group_ids:

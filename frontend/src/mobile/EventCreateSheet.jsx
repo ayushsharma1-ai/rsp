@@ -82,6 +82,7 @@ export default function EventCreateSheet({ open, onClose, onCreated, defaultDate
     const start = toISO(form.date, form.start_time)
     const end = toISO(form.date, form.end_time)
     if (new Date(end) <= new Date(start)) { setError('End time must be after start time.'); return }
+    if (new Date(start) < new Date()) { setError("You can't create an event in the past."); return }
     setLoading(true)
     try {
       const bookings = form.resources.map(rid => ({ resource_id: rid, start_time: start, end_time: end, notes: '' }))
@@ -122,7 +123,7 @@ export default function EventCreateSheet({ open, onClose, onCreated, defaultDate
 
         <div>
           <label className="m-label">Date</label>
-          <input className="m-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+          <input className="m-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} min={localDate(new Date())} />
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
