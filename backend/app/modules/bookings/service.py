@@ -1234,6 +1234,7 @@ def _get_calendar_events(self, actor, start, end):
     from datetime import datetime, timedelta, timezone
 
     result = []
+    is_anon = actor is None        # anonymous (public) viewer — no logged-in user
 
     # Helper — strips timezone info and normalises to UTC naive datetime
     # Used for reliable datetime comparison regardless of how
@@ -1261,7 +1262,9 @@ def _get_calendar_events(self, actor, start, end):
         Event.is_recurring_root == False,
         Event.parent_event_id == None,        # exclude exception rows
     )
-    if actor.role != UserRole.ADMIN:
+    if is_anon:
+        q = q.filter(Event.is_public == True)                       # public viewers: public events only
+    elif actor.role != UserRole.ADMIN:
         q = q.filter(
             or_(Event.organizer_id == actor.id, Event.is_public == True)
         )
@@ -1280,8 +1283,8 @@ def _get_calendar_events(self, actor, start, end):
             "end":              e.end_time.isoformat(),
             "status":           e.status.value,
             "booking_statuses": booking_statuses,
-            "is_mine":          e.organizer_id == actor.id,
-            "organizer_id":     e.organizer_id,
+            "is_mine":          (not is_anon) and e.organizer_id == actor.id,
+            "organizer_id":     None if is_anon else e.organizer_id,
             "description":      e.description,
             "is_public":        e.is_public,
             "color":            e.color,
@@ -1300,7 +1303,9 @@ def _get_calendar_events(self, actor, start, end):
         Event.is_recurring_root == True,
         Event.status != EventStatus.CANCELLED,
     )
-    if actor.role != UserRole.ADMIN:
+    if is_anon:
+        rq = rq.filter(Event.is_public == True)
+    elif actor.role != UserRole.ADMIN:
         rq = rq.filter(
             or_(Event.organizer_id == actor.id, Event.is_public == True)
         )
@@ -1377,8 +1382,8 @@ def _get_calendar_events(self, actor, start, end):
                     "end":              exception.end_time.isoformat(),
                     "status":           exception.status.value,
                     "booking_statuses": booking_statuses,
-                    "is_mine":          root_event.organizer_id == actor.id,
-                    "organizer_id":     root_event.organizer_id,
+                    "is_mine":          (not is_anon) and root_event.organizer_id == actor.id,
+                    "organizer_id":     None if is_anon else root_event.organizer_id,
                     "description":      exception.description,
                     "is_public":        root_event.is_public,
                     "color":            exception.color or root_event.color,
@@ -1402,8 +1407,8 @@ def _get_calendar_events(self, actor, start, end):
                     "end":              occ_end,
                     "status":           root_event.status.value,
                     "booking_statuses": booking_statuses,
-                    "is_mine":          root_event.organizer_id == actor.id,
-                    "organizer_id":     root_event.organizer_id,
+                    "is_mine":          (not is_anon) and root_event.organizer_id == actor.id,
+                    "organizer_id":     None if is_anon else root_event.organizer_id,
                     "description":      root_event.description,
                     "is_public":        root_event.is_public,
                     "color":            root_event.color,

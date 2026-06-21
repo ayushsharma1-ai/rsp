@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, CalendarDays, Settings, ChevronLeft, Sun, Moon } from 'lucide-react'
 import { useTheme, haptic } from '../mobile/theme'
+import { useAuthStore } from '../store/authStore'
+import { useAuthGate } from './AuthGateV3'
 import api from '../lib/api'
 import { useAutoRefresh } from './useAutoRefresh'
 
@@ -15,18 +17,21 @@ const TITLES = {
 
 export default function AppShellV3() {
   const [theme, toggle] = useTheme()
+  const { user } = useAuthStore()
+  const { requireLogin } = useAuthGate()
   const loc = useLocation()
   const navigate = useNavigate()
   const isTab = TAB_PATHS.includes(loc.pathname)
   const title = TITLES[loc.pathname] || 'RSP'
 
-  // unread-notification dot on the Activity tab
+  // unread-notification dot on the Activity tab — only for logged-in users
   const [unread, setUnread] = useState(0)
   const loadUnread = useCallback(() => {
+    if (!user) { setUnread(0); return }   // anonymous: nothing personal to load
     api.get('/users/me/notifications')
       .then(r => setUnread(r.data.filter(n => !n.is_read).length))
       .catch(() => {})
-  }, [])
+  }, [user])
   useEffect(() => { loadUnread() }, [loadUnread, loc.pathname]) // refresh when you change tabs
   useAutoRefresh(loadUnread, 30000)
 
@@ -39,9 +44,14 @@ export default function AppShellV3() {
           )}
           <span className="v-topbar__title">{title}</span>
         </div>
-        <button className="v-iconbtn" onClick={() => { haptic(); toggle() }} aria-label="Toggle theme">
-          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {!user && (
+            <button className="m-chip m-chip--active" onClick={() => { haptic(); requireLogin() }}>Sign in</button>
+          )}
+          <button className="v-iconbtn" onClick={() => { haptic(); toggle() }} aria-label="Toggle theme">
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+        </div>
       </header>
 
       <main className="v-content"><Outlet /></main>

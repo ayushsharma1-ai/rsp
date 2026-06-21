@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.core.config import settings
 from app.modules.models import User, UserRole
 
 bearer_scheme = HTTPBearer()
+optional_bearer = HTTPBearer(auto_error=False)   # same scheme, but no 401 when the header is missing
 
 
 class RegisterRequest(BaseModel):
@@ -44,6 +46,24 @@ def get_current_user(
     user = db.query(User).filter(User.id == payload.get("sub")).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
+
+
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_bearer),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Public-read variant of get_current_user. Returns the User when a valid token is
+    present, otherwise None (NO 401). Endpoints anyone may read (e.g. the calendar) use this
+    and then branch on `user is None` to decide what an anonymous caller may see."""
+    if not credentials:
+        return None
+    payload = decode_token(credentials.credentials)
+    if not payload:
+        return None
+    user = db.query(User).filter(User.id == payload.get("sub")).first()
+    if not user or not user.is_active:
+        return None
     return user
 
 

@@ -14,6 +14,7 @@ import { TIME_SLOTS, toISO } from '../mobile/lib'
 import { haptic } from '../mobile/theme'
 import { VENUES, venueColorForName, readableOn } from './config'
 import { useAutoRefresh } from './useAutoRefresh'
+import { useAuthGate } from './AuthGateV3'
 import CreateEventV3 from './CreateEventV3'
 import SheetV3 from './SheetV3'
 import DayGrid from './DayGrid'
@@ -62,6 +63,9 @@ export function CalendarV3() {
   const [create, setCreate] = useState(null)          // {date, start, end}
   const [moving, setMoving] = useState(null)
   const today = startOfDay(new Date())
+  // Calendar is public to view; any write action routes through this — anonymous → a
+  // login sheet that RESUMES the action after sign-in (no redirect).
+  const { requireLogin: requireAuth } = useAuthGate()
 
   const range = useMemo(() => {
     if (view === 'day') return { start: startOfDay(cursor), end: endOfDay(cursor) }
@@ -171,9 +175,9 @@ export function CalendarV3() {
       {view === 'week' && <WeekView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onPickDay={goDay} onEvent={openDetail} onPrev={stepBack} onNext={stepFwd} />}
       {view === 'day' && <DayView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onBack={backFromDay} creating={!!create}
         onPrev={stepBack} onNext={stepFwd} onToday={() => setCursor(today)}
-        onEvent={openDetail} onCreate={(start, end) => setCreate({ date: format(cursor, 'yyyy-MM-dd'), start, end })} />}
+        onEvent={openDetail} onCreate={(start, end) => requireAuth(() => setCreate({ date: format(cursor, 'yyyy-MM-dd'), start, end }))} />}
 
-      <button className="v-fab" aria-label="New event" onClick={() => { haptic(); if (view !== 'day') goDay(cursor); else setCreate({ date: format(cursor, 'yyyy-MM-dd'), start: '09:00', end: '10:00' }) }}><Plus size={24} /></button>
+      <button className="v-fab" aria-label="New event" onClick={() => requireAuth(() => { haptic(); if (view !== 'day') goDay(cursor); else setCreate({ date: format(cursor, 'yyyy-MM-dd'), start: '09:00', end: '10:00' }) })}><Plus size={24} /></button>
 
       <CreateEventV3 open={!!create} onClose={() => setCreate(null)} date={create?.date} start={create?.start} end={create?.end}
         onCreated={() => { setCreate(null); load(); loadVenues() }} />

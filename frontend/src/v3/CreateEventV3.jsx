@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Globe, Lock } from 'lucide-react'
 import api from '../lib/api'
 import { Btn, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
@@ -34,6 +34,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
   const [groups, setGroups] = useState([])
   const [kinds, setKinds] = useState([])
   const [kindId, setKindId] = useState(null)        // chosen event type → drives colour
+  const [isPublic, setIsPublic] = useState(true)    // public = visible on the open calendar
   const [startT, setStartT] = useState(start || '09:00')
   const [endT, setEndT] = useState(end || '10:00')
   const [resources, setResources] = useState([])
@@ -50,7 +51,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     let s = start || floor
     if (s < floor) s = floor                              // never default into the past
     const e = (end && end > s) ? end : slotAfter(s, 2)    // default 1h, always after start
-    setTitle(''); setVenue('601H-N'); setLink(''); setGroups([])
+    setTitle(''); setVenue('601H-N'); setLink(''); setGroups([]); setIsPublic(true)
     setStartT(s); setEndT(e)
     setError(''); setClashes([]); setRequested({})
     api.get('/resources').then(r => setResources(r.data)).catch(() => {})
@@ -120,7 +121,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
       const startISO = toISO(date, startT), endISO = toISO(date, endT)
       const bookings = mappedResource ? [{ resource_id: mappedResource.id, start_time: startISO, end_time: endISO, notes: '' }] : []
       const description = isOnline ? `Online meeting: ${link.trim()}` : ''
-      await api.post('/events', { title: title.trim(), description, start_time: startISO, end_time: endISO, is_public: true, bookings, group_ids: groupIds, category: 'adhoc', event_kind_id: kindId })
+      await api.post('/events', { title: title.trim(), description, start_time: startISO, end_time: endISO, is_public: isPublic, bookings, group_ids: groupIds, category: 'adhoc', event_kind_id: kindId })
       haptic(12); snack('Event created'); onCreated && onCreated()
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not create — that slot may be busy.')
@@ -204,6 +205,21 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
                   </button>
                 ))}
               </div>}
+        </div>
+
+        <div>
+          <label className="m-label">Visibility</label>
+          <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
+            <button type="button" className={`m-chip ${isPublic ? 'm-chip--active' : ''}`} onClick={() => { haptic(); setIsPublic(true) }}>
+              <Globe size={13} style={{ verticalAlign: '-2px', marginRight: 5 }} />Public
+            </button>
+            <button type="button" className={`m-chip ${!isPublic ? 'm-chip--active' : ''}`} onClick={() => { haptic(); setIsPublic(false) }}>
+              <Lock size={13} style={{ verticalAlign: '-2px', marginRight: 5 }} />Private
+            </button>
+          </div>
+          <div className="m-muted" style={{ fontSize: '0.76rem', marginTop: 6, marginLeft: 2 }}>
+            {isPublic ? 'Anyone viewing the calendar can see this event.' : 'Hidden from the public calendar — only you and admins can see it.'}
+          </div>
         </div>
 
         {venueClashes.length > 0 && (

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.service import get_current_user
+from app.modules.auth.service import get_current_user, get_current_user_optional
 from app.modules.models import User, BookingStatus
 from app.modules.bookings.service import (
     BookingService, EventCreate, EventOut,
@@ -136,7 +136,7 @@ def calendar_view(
     start: datetime = Query(...),
     end:   datetime = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),   # anonymous allowed → None
 ):
     return BookingService(db).get_calendar_events(current_user, start, end)
 

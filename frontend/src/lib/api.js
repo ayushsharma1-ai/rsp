@@ -14,8 +14,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    // Only force a re-login when a token we HAD got rejected (expired session).
+    // Anonymous callers (no token) are allowed — e.g. viewing the public calendar —
+    // so a 401 on a logged-in-only call just rejects and the caller handles it.
+    if (err.response?.status === 401 && localStorage.getItem('token')) {
       localStorage.removeItem('token')
+      localStorage.removeItem('user')
       window.location.href = '/login'
     }
     return Promise.reject(err)

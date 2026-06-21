@@ -5,6 +5,7 @@ import './v3/v3.css'
 import { useAuthStore } from './store/authStore'
 import { SnackProvider } from './mobile/ui'
 import AppShellV3 from './v3/AppShellV3'
+import { AuthGateProvider } from './v3/AuthGateV3'
 import LoginV3 from './v3/LoginV3'
 import { CalendarV3 } from './v3/CalendarV3'
 import { NotificationsV3 } from './v3/NotificationsV3'
@@ -25,20 +26,23 @@ function AppV3() {
   const { token } = useAuthStore()
   return (
     <HashRouter>
+      <AuthGateProvider>
       <Routes>
         <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginV3 />} />
-        <Route path="/" element={<RequireAuth><AppShellV3 /></RequireAuth>}>
+        <Route path="/" element={<AppShellV3 />}>
+          {/* Calendar is PUBLIC — anyone can view. Everything else needs login. */}
           <Route index element={<CalendarV3 />} />
-          <Route path="notifications" element={<NotificationsV3 />} />
-          <Route path="settings" element={<SettingsV3 />} />
-          <Route path="bookings" element={<BookingsV3 />} />
-          <Route path="groups" element={<GroupsV3 />} />
-          <Route path="users" element={<UsersV3 />} />
-          <Route path="requests" element={<RequestsV3 />} />
-          <Route path="feedback" element={<FeedbackScreen />} />
+          <Route path="notifications" element={<RequireAuth><NotificationsV3 /></RequireAuth>} />
+          <Route path="settings" element={<RequireAuth><SettingsV3 /></RequireAuth>} />
+          <Route path="bookings" element={<RequireAuth><BookingsV3 /></RequireAuth>} />
+          <Route path="groups" element={<RequireAuth><GroupsV3 /></RequireAuth>} />
+          <Route path="users" element={<RequireAuth><UsersV3 /></RequireAuth>} />
+          <Route path="requests" element={<RequireAuth><RequestsV3 /></RequireAuth>} />
+          <Route path="feedback" element={<RequireAuth><FeedbackScreen /></RequireAuth>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </AuthGateProvider>
     </HashRouter>
   )
 }
