@@ -21,6 +21,11 @@ export default function AppShellV3() {
   const { requireLogin } = useAuthGate()
   const loc = useLocation()
   const navigate = useNavigate()
+
+  // Anonymous tap on a personal tab → pop the login sheet (and resume to that tab
+  // after sign-in), instead of bouncing to the full login page. The route's own
+  // RequireAuth still guards direct-URL access.
+  const gateTab = (e, to) => { haptic(); if (!user) { e.preventDefault(); requireLogin(() => navigate(to)) } }
   const isTab = TAB_PATHS.includes(loc.pathname)
   const title = TITLES[loc.pathname] || 'RSP'
 
@@ -57,7 +62,7 @@ export default function AppShellV3() {
       <main className="v-content"><Outlet /></main>
 
       <nav className="v-tabbar">
-        <NavLink to="/notifications" onClick={haptic} className={({ isActive }) => `v-tab ${isActive ? 'v-tab--active' : ''}`}>
+        <NavLink to="/notifications" onClick={(e) => gateTab(e, '/notifications')} className={({ isActive }) => `v-tab ${isActive ? 'v-tab--active' : ''}`}>
           <span style={{ position: 'relative', display: 'inline-flex' }}>
             <Bell size={22} />
             {unread > 0 && <span className="v-tab__dot" />}
@@ -67,7 +72,7 @@ export default function AppShellV3() {
         <NavLink to="/" end onClick={haptic} className={({ isActive }) => `v-tab v-tab--center ${isActive ? 'v-tab--active' : ''}`}>
           <span className="v-tab__badge"><CalendarDays size={26} /></span>
         </NavLink>
-        <NavLink to="/settings" onClick={haptic} className={({ isActive }) => `v-tab ${isActive ? 'v-tab--active' : ''}`}>
+        <NavLink to="/settings" onClick={(e) => gateTab(e, '/settings')} className={({ isActive }) => `v-tab ${isActive ? 'v-tab--active' : ''}`}>
           <Settings size={22} /><span>Settings</span>
         </NavLink>
       </nav>

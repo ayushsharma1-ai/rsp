@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { Btn } from '../mobile/ui'
 
@@ -46,7 +47,11 @@ export default function LoginV3() {
   const switchMode = () => { setMode(isRegister ? 'login' : 'register'); setError('') }
 
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24, padding: 24 }}>
+    <div style={{ position: 'relative', minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24, padding: 24 }}>
+      <button type="button" onClick={() => navigate('/')} aria-label="Back to calendar"
+        style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 14, display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 12, padding: '8px 13px 8px 9px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+        <ChevronLeft size={17} /> Calendar
+      </button>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--grad-brand)', boxShadow: 'var(--glow-brand)', color: 'var(--on-accent)', fontFamily: 'Syne', fontWeight: 800, fontSize: '1.4rem', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>RSP</div>
         <h1 className="v-h" style={{ margin: 0, fontSize: '1.8rem' }}>Scheduler</h1>
