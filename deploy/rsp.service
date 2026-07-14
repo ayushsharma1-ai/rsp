@@ -1,0 +1,51 @@
+# ============================================================================
+#  RSP backend — systemd unit   →  /etc/systemd/system/rsp.service
+#
+#  systemd is Linux's "keep this running" manager. This file registers the
+#  FastAPI backend so it starts on boot and restarts automatically if it crashes.
+#
+#  Install:
+#     sudo cp rsp.service /etc/systemd/system/rsp.service
+#     sudo systemctl daemon-reload
+#     sudo systemctl enable --now rsp          # start now + on every boot
+#     sudo systemctl status rsp                # check it's running
+#     journalctl -u rsp -f                     # live logs
+#
+#  Assumes:
+#     - code at            /opt/rsp/backend
+#     - virtualenv at      /opt/rsp/backend/venv   (python -m venv venv)
+#     - production secrets /opt/rsp/backend/.env   (ENV=production, real SECRET_KEY, DB creds, CORS_ORIGINS)
+#     - a dedicated OS user `rsp` that owns /opt/rsp  (adduser --system --group rsp)
+# ============================================================================
+[Unit]
+Description=RSP FastAPI backend (uvicorn)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=rsp
+Group=rsp
+WorkingDirectory=/opt/rsp/backend
+
+# Secrets & config are read from the .env file, not baked into this unit.
+EnvironmentFile=/opt/rsp/backend/.env
+
+# Bind to localhost ONLY — the public never talks to uvicorn directly; nginx does.
+# 4 workers is a sane default for a small VM (roughly: 2 × CPU cores, capped).
+ExecStart=/opt/rsp/backend/venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 --port 8000 --workers 4 --proxy-headers
+
+Restart=always
+RestartSec=3
+
+# ---- Sandbox hardening (least privilege for the service) --------------------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,14 +1,28 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from functools import lru_cache
+
+# The shipped dev default — MUST be overridden in production (guarded below).
+_DEFAULT_SECRET = "dev-secret-key-change-in-production-must-be-32-chars-min"
 
 
 class Settings(BaseSettings):
+    # Set ENV=production on the live server to turn on the safety guards below.
+    ENV: str = "development"
+
     DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/rsp_db"
-    SECRET_KEY: str = "dev-secret-key-change-in-production-must-be-32-chars-min"
+    SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
 
-    # SMTP (Phase 4 — email + ICS). All optional; email no-ops if unset.
+    # Only emails on this domain may be added / may log in (department restriction).
+    ALLOWED_EMAIL_DOMAIN: str = "iitk.ac.in"
+
+    # Comma-separated list of allowed browser origins. "*" is fine for local dev;
+    # in production this MUST be your real frontend origin(s).
+    CORS_ORIGINS: str = "*"
+
+    # SMTP (email). All optional; email no-ops if unset.
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
@@ -17,6 +31,31 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENV.strip().lower() in ("production", "prod")
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()] or ["*"]
+
+    @model_validator(mode="after")
+    def _production_guards(self):
+        # Refuse to boot with insecure defaults once ENV=production.
+        if self.is_production:
+            problems = []
+            if self.SECRET_KEY == _DEFAULT_SECRET or len(self.SECRET_KEY) < 32:
+                problems.append("SECRET_KEY must be a strong 32+ char value (not the default)")
+            if "postgres:password@" in self.DATABASE_URL:
+                problems.append("DATABASE_URL still uses the default credentials")
+            if self.CORS_ORIGINS.strip() == "*":
+                problems.append("CORS_ORIGINS must list your real domain(s), not '*'")
+            if problems:
+                raise ValueError(
+                    "Refusing to start — insecure production config: " + "; ".join(problems)
+                )
+        return self
 
 
 @lru_cache()

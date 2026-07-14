@@ -61,6 +61,7 @@ export function CalendarV3() {
   const [active, setActive] = useState(() => new Set([...VENUES.map(v => v.key), 'other']))
   const [sel, setSel] = useState(null)
   const [create, setCreate] = useState(null)          // {date, start, end}
+  const [daySel, setDaySel] = useState(null)          // current day-grid slot {start,end} in HH:MM
   const [moving, setMoving] = useState(null)
   const today = startOfDay(new Date())
   // Calendar is public to view; any write action routes through this — anonymous → a
@@ -174,10 +175,18 @@ export function CalendarV3() {
       {view === 'month' && <MonthView cursor={cursor} today={today} events={visible} eventColor={eventColor} onPick={goDay} />}
       {view === 'week' && <WeekView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onPickDay={goDay} onEvent={openDetail} onPrev={stepBack} onNext={stepFwd} />}
       {view === 'day' && <DayView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onBack={backFromDay} creating={!!create}
-        onPrev={stepBack} onNext={stepFwd} onToday={() => setCursor(today)}
+        onPrev={stepBack} onNext={stepFwd} onToday={() => setCursor(today)} onSelect={setDaySel}
         onEvent={openDetail} onCreate={(start, end) => requireAuth(() => setCreate({ date: format(cursor, 'yyyy-MM-dd'), start, end }))} />}
 
-      <button className="v-fab" aria-label="New event" onClick={() => requireAuth(() => { haptic(); if (view !== 'day') goDay(cursor); else setCreate({ date: format(cursor, 'yyyy-MM-dd'), start: '09:00', end: '10:00' }) })}><Plus size={24} /></button>
+      {/* + creates at the SELECTED slot when the day grid has one; otherwise a
+          sensible default (CreateEventV3 fills the next free time). On week/month
+          it first drops into the day so you can pick a time. */}
+      <button className="v-fab" aria-label="New event" onClick={() => requireAuth(() => {
+        haptic()
+        if (view !== 'day') { goDay(cursor); return }
+        const base = { date: format(cursor, 'yyyy-MM-dd') }
+        setCreate(daySel ? { ...base, start: daySel.start, end: daySel.end } : base)
+      })}><Plus size={24} /></button>
 
       <CreateEventV3 open={!!create} onClose={() => setCreate(null)} date={create?.date} start={create?.start} end={create?.end}
         onCreated={() => { setCreate(null); load(); loadVenues() }} />
@@ -301,7 +310,7 @@ function WeekView({ cursor, today, events, eventColor, loading, onPickDay, onEve
   )
 }
 
-function DayView({ cursor, today, events, eventColor, loading, onBack, onPrev, onNext, onToday, creating, onEvent, onCreate }) {
+function DayView({ cursor, today, events, eventColor, loading, onBack, onPrev, onNext, onToday, creating, onEvent, onCreate, onSelect }) {
   const isToday = isSameDay(cursor, today)
   return (
     <div>
@@ -326,7 +335,7 @@ function DayView({ cursor, today, events, eventColor, loading, onBack, onPrev, o
       </div>
 
       <DayGrid cursor={cursor} today={today} events={events} eventColor={eventColor}
-        confirmLabel="Add event" sheetOpen={creating} onEventTap={onEvent}
+        confirmLabel="Add event" sheetOpen={creating} onEventTap={onEvent} onSelect={onSelect}
         onConfirm={(s, e) => onCreate(s, e)} />
     </div>
   )

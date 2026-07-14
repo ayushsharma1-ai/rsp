@@ -11,5 +11,8 @@ dist/
 # OS
 .DS_Store
 
+# Local editor / tooling config (per-machine, not shared)
+.claude/
+
 # Personal study notes — kept local, not pushed
-learning/ 
+learning/

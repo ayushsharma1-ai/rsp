@@ -30,17 +30,21 @@ export default function SheetV3({ open, onClose, title, children }) {
 
   if (!open) return null
 
+  // Pointer events unify touch + mouse + pen. setPointerCapture keeps move/up
+  // firing even when the cursor leaves the small grab handle — without it, a
+  // MOUSE drag cancels the instant you slide off the handle (broke on desktop).
   const onStart = (e) => {
-    startY.current = (e.touches ? e.touches[0].clientY : e.clientY)
+    startY.current = e.clientY
     sheetH.current = ref.current?.offsetHeight || 400
+    e.currentTarget.setPointerCapture?.(e.pointerId)
   }
   const onMove = (e) => {
     if (startY.current == null) return
-    const y = (e.touches ? e.touches[0].clientY : e.clientY)
-    setDrag(Math.max(0, y - startY.current))
+    setDrag(Math.max(0, e.clientY - startY.current))
   }
-  const onEnd = () => {
+  const onEnd = (e) => {
     if (startY.current == null) return
+    e?.currentTarget?.releasePointerCapture?.(e.pointerId)
     const threshold = Math.min(140, sheetH.current * 0.32)
     if (drag > threshold) { startY.current = null; onClose && onClose() }
     else { setDrag(0); startY.current = null }
@@ -54,8 +58,7 @@ export default function SheetV3({ open, onClose, title, children }) {
       <div className="m-sheet" ref={ref} role="dialog" aria-modal="true"
         style={{ transform: `translateY(${drag}px)`, transition: startY.current == null ? 'transform 0.25s cubic-bezier(0.2,0.8,0.2,1)' : 'none' }}>
         <div className="m-sheet__grab"
-          onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
-          onMouseDown={onStart} onMouseMove={(e) => startY.current != null && onMove(e)} onMouseUp={onEnd} onMouseLeave={onEnd}>
+          onPointerDown={onStart} onPointerMove={onMove} onPointerUp={onEnd} onPointerCancel={onEnd}>
           <div className="m-sheet__handle" />
           {title && <h3 className="m-sheet__title">{title}</h3>}
         </div>

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.auth.service import get_current_user, require_admin
 from app.modules.models import User
-from app.modules.users.service import UserService, UserOut, UserUpdate, NotificationOut
+from app.modules.users.service import UserService, UserOut, UserUpdate, NotificationOut, MemberCreate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -16,6 +16,15 @@ def list_users(
     current_user: User = Depends(require_admin),
 ):
     return UserService(db).list_users()
+
+
+@router.post("", response_model=UserOut, status_code=201)
+def create_member(
+    data: MemberCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),   # only an admin can add members
+):
+    return UserService(db).create_member(data)
 
 
 @router.get("/me/notifications")

@@ -9,7 +9,7 @@ import { DAY_START, DAY_END, DAY_PX, hhmm, evMins, layoutOverlaps, scrollToHour 
 // The touch day grid: time rows, events (overlaps side-by-side), tap+drag to
 // pick a slot, "now" line, and a confirm bar. Shared by event-create and
 // event-move so both feel identical.
-export default function DayGrid({ cursor, today, events, eventColor, confirmLabel = 'Add event', onConfirm, onEventTap, sheetOpen }) {
+export default function DayGrid({ cursor, today, events, eventColor, confirmLabel = 'Add event', onConfirm, onEventTap, onSelect, sheetOpen }) {
   const hours = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i)
   const dayEvents = (events || []).filter(e => isSameDay(parseISO(e.start), cursor))
   const isToday = isSameDay(cursor, today || new Date())
@@ -19,6 +19,17 @@ export default function DayGrid({ cursor, today, events, eventColor, confirmLabe
 
   // clear the selection when an owning sheet closes (create flow passes its open flag)
   useEffect(() => { if (sheetOpen === false) setBox(null) }, [sheetOpen])
+
+  // Report the current slot to the parent so the "+" button can create at the
+  // SELECTED time (not a fixed default). Guarded on the snapped HH:MM value so a
+  // drag doesn't spam the parent with re-renders when the 30-min slot is unchanged.
+  const lastSel = useRef(null)
+  useEffect(() => {
+    const v = box ? `${hhmm(box.start)}-${hhmm(box.end)}` : null
+    if (v === lastSel.current) return
+    lastSel.current = v
+    onSelect && onSelect(box ? { start: hhmm(box.start), end: hhmm(box.end) } : null)
+  }, [box]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Snap to 30-min increments so selected times always exist in the create/edit
   // dropdowns (TIME_SLOTS is :00/:30 only). 15-min snapping produced :15/:45

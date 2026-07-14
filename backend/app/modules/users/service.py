@@ -1,10 +1,11 @@
 from typing import List, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from app.modules.models import User, UserRole, Notification
 from app.core.security import get_password_hash
+from app.core.config import settings
 
 
 class UserOut(BaseModel):
@@ -22,6 +23,13 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+
+
+class MemberCreate(BaseModel):
+    email: EmailStr
+    full_name: str
+    password: str
+    role: UserRole = UserRole.PROFESSOR
 
 
 class NotificationOut(BaseModel):
@@ -42,6 +50,31 @@ class UserService:
 
     def list_users(self) -> List[User]:
         return self.db.query(User).order_by(User.full_name).all()
+
+    def create_member(self, data: 'MemberCreate') -> User:
+        """Admin-only: add a department member. Enforces the allowed email domain,
+        uniqueness, and a minimum password length. (There is no public self-signup.)"""
+        email = data.email.strip().lower()
+        domain = "@" + settings.ALLOWED_EMAIL_DOMAIN.strip().lower()
+        if not email.endswith(domain):
+            raise HTTPException(status_code=400, detail=f"Email must be a {domain} address")
+        if not data.full_name.strip():
+            raise HTTPException(status_code=400, detail="Full name is required")
+        if len(data.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        if self.db.query(User).filter(User.email == email).first():
+            raise HTTPException(status_code=409, detail="A user with this email already exists")
+        user = User(
+            email=email,
+            full_name=data.full_name.strip(),
+            hashed_password=get_password_hash(data.password),
+            role=data.role,
+            is_active=True,
+        )
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
 
     def get_user(self, user_id: str) -> User:
         u = self.db.query(User).filter(User.id == user_id).first()

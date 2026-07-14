@@ -383,3 +383,44 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 /* full-screen reschedule / move pickers — smooth premium entrance */
 .v-moveoverlay { animation: v-overlay-in .26s cubic-bezier(.2,.8,.2,1); }
 @keyframes v-overlay-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ============================================================
+   RESPONSIVE DESKTOP — at ≥960px the bottom tab bar becomes a left
+   sidebar and the content widens. Mobile is untouched. One codebase.
+   ============================================================ */
+.v-sidebar { display: none; }
+.v-sidebar__brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
+.v-sidebar__logo { width: 34px; height: 34px; border-radius: 10px; background: var(--grad-brand); color: var(--on-accent); display: grid; place-items: center; font-family: 'Syne','DM Sans',sans-serif; font-weight: 800; box-shadow: var(--glow-brand); }
+.v-sidebar__name { font-family: 'Syne','DM Sans',sans-serif; font-weight: 800; font-size: 1.15rem; }
+.v-sidebar__nav { display: flex; flex-direction: column; gap: 3px; }
+.v-side__link { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; color: var(--text-2); text-decoration: none; font-weight: 600; font-size: 0.92rem; transition: background .15s, color .15s; }
+.v-side__link:hover { background: var(--surface-2); color: var(--text); }
+.v-side__link--active { background: var(--surface); color: var(--text); box-shadow: var(--elev-1), var(--hairline); }
+.v-side__link svg { color: inherit; flex: 0 0 auto; }
+.v-sidebar__foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+@media (min-width: 960px) {
+  .v-app { max-width: none; margin: 0; border: none; padding-left: 240px; }
+  .v-topbar { display: none; }
+  .v-tabbar { display: none; }
+  .v-sidebar {
+    display: flex; flex-direction: column;
+    position: fixed; left: 0; top: 0; bottom: 0; width: 240px; z-index: 40;
+    padding: 20px 14px 18px;
+    background: var(--bar-bg);
+    backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border-right: 1px solid var(--border);
+  }
+  /* .v-content is a flex item of .v-app — it must STRETCH (fill), not use
+     margin:auto (auto margins on a flex item collapse it to content width).
+     We center a normal block wrapper inside it instead. */
+  .v-content { padding: 26px 40px; }
+  .v-content__inner { max-width: 1040px; margin: 0 auto; }
+  .v-fab { right: 40px; bottom: 34px; }
+  /* Sheet + snackbar centered over the content area (right of the 240px sidebar).
+     Center via left/right/margin, NOT transform — the sheet's inline drag
+     transform is translateY(), which would otherwise wipe out translateX(-50%). */
+  .m-sheet { left: 240px; right: 0; margin-inline: auto; max-width: 460px; border-radius: 22px; bottom: 24px; }
+  .m-snackbar { left: 240px; right: 0; margin-inline: auto; max-width: 460px; transform: none; }
+  .v-selbar { left: calc(240px + 24px); right: 24px; bottom: 24px; }
+}

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.limiter import limiter           # ← from core, not main
 from app.modules.auth.service import (
-    AuthService, RegisterRequest, LoginRequest, TokenResponse, get_current_user
+    AuthService, LoginRequest, TokenResponse, get_current_user
 )
 from app.modules.models import User
 from app.modules.users.service import UserOut
@@ -12,10 +12,8 @@ from app.modules.users.service import UserOut
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=TokenResponse)
-@limiter.limit("10/minute")
-def register(request: Request, data: RegisterRequest, db: Session = Depends(get_db)):
-    return AuthService(db).register(data)
+# Public self-signup is intentionally removed — accounts are created by an admin only
+# (POST /users, admin-guarded). See users/service.create_member.
 
 
 @router.post("/login", response_model=TokenResponse)

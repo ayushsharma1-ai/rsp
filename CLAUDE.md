@@ -59,6 +59,15 @@ rsp/
         └── lib/               # Axios API client with JWT interceptor
 ```
 
+### Frontend versions & direction (IMPORTANT — read before touching frontend)
+
+There are **three** frontends under `frontend/`, all built into one Vite bundle:
+- **v1 — desktop** (`index.html` → `src/main.jsx`; code in `src/pages/` + `src/components/`; BrowserRouter). **Being superseded.**
+- **v2 — old mobile PWA** (`mobile.html` → `src/main-mobile.jsx`; `src/mobile/`). Unused (not in the redirect). v3 borrows a few primitives from here: `mobile/theme.js`, `mobile/ui.jsx`, `mobile/lib.js`.
+- **v3 — current mobile app** (`v3.html` → `src/main-v3.jsx`; `src/v3/`; HashRouter). **The source of truth.** `index.html` redirects phones/tablets → `/v3.html`.
+
+**Plan (decided 2026-06-18):** build every feature in **v3 (mobile) first** — it's primary. Deliver desktop by making **v3 responsive** (ONE codebase: sidebar + wider layout at a desktop breakpoint), NOT by maintaining a separate desktop app. **v1 and v2 are to be retired.** Do not add new features to v1; build in v3 only.
+
 ---
 
 ## Domain model
@@ -260,6 +269,16 @@ alembic downgrade -1
 ---
 
 ## Deployment
+
+**Current target (2026-07): self-hosted on an institute VM behind nginx + HTTPS.**
+The production runbook and artifacts live in `deploy/`:
+- `deploy/DEPLOY.md` — full step-by-step (packages → DB → .env → systemd → build → nginx → certbot → firewall → pre-VAPT checklist).
+- `deploy/nginx.conf` — HTTPS, security headers, `/api`→uvicorn proxy, SPA fallback, dotfile block.
+- `deploy/rsp.service` — systemd unit running uvicorn on `127.0.0.1:8000`.
+- Concept guides: `learning/DEPLOYMENT_AND_SECURITY.md`, `learning/HTTPS_CERTIFICATES_FIREWALL.html`.
+- Note: FastAPI `/docs`,`/redoc`,`/openapi.json` are auto-disabled when `ENV=production` (see `app/main.py`).
+
+The Render/Vercel setup below was the earlier hosting approach — kept for reference.
 
 | Service | Platform | URL |
 |---|---|---|

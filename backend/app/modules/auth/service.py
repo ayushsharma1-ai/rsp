@@ -86,6 +86,10 @@ class AuthService:
         self.db = db
 
     def register(self, req: RegisterRequest) -> TokenResponse:
+        # Never let the public sign-up form grant admin — the frontend hides it, but
+        # the API must enforce it too (defence in depth).
+        if req.role == UserRole.ADMIN:
+            raise HTTPException(status_code=403, detail="You can't register as an admin.")
         existing = self.db.query(User).filter(User.email == req.email).first()
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")

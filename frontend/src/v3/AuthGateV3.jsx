@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { Btn } from '../mobile/ui'
 import SheetV3 from './SheetV3'
+
+const DOMAIN = 'iitk.ac.in'
 
 const Ctx = createContext({ requireLogin: () => {} })
 export const useAuthGate = () => useContext(Ctx)
@@ -32,19 +33,18 @@ export function AuthGateProvider({ children }) {
 
 function LoginSheet({ open, onClose, onSuccess }) {
   const { login } = useAuthStore()
-  const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')   // the part before @iitk.ac.in
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => { if (open) { setEmail(''); setPassword(''); setError('') } }, [open])
+  useEffect(() => { if (open) { setUsername(''); setPassword(''); setError('') } }, [open])
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!email.trim() || !password) { setError('Enter your email and password.'); return }
+    if (!username.trim() || !password) { setError('Enter your username and password.'); return }
     setLoading(true); setError('')
-    try { await login(email.trim(), password); onSuccess() }
+    try { await login(`${username.trim().toLowerCase()}@${DOMAIN}`, password); onSuccess() }
     catch (err) { setError(err.response?.data?.detail || 'Login failed — check your details.') }
     finally { setLoading(false) }
   }
@@ -57,8 +57,12 @@ function LoginSheet({ open, onClose, onSuccess }) {
         </div>
         <div>
           <label className="m-label">Email</label>
-          <input className="m-input" type="email" autoComplete="email" value={email}
-            onChange={e => setEmail(e.target.value)} placeholder="you@iitk.ac.in" autoFocus />
+          <div className="m-input" style={{ display: 'flex', alignItems: 'center', padding: '0 12px 0 14px', gap: 2 }}>
+            <input value={username} onChange={e => setUsername(e.target.value)} placeholder="firstname.lastname"
+              autoComplete="username" autoCapitalize="none" autoCorrect="off" autoFocus
+              style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: '1rem', height: '46px' }} />
+            <span style={{ color: 'var(--text-2)', fontWeight: 600, whiteSpace: 'nowrap' }}>@{DOMAIN}</span>
+          </div>
         </div>
         <div>
           <label className="m-label">Password</label>
@@ -67,8 +71,9 @@ function LoginSheet({ open, onClose, onSuccess }) {
         </div>
         {error && <p className="m-error">{error}</p>}
         <Btn variant="primary" full loading={loading} type="submit">Sign in</Btn>
-        <button type="button" className="m-link" style={{ textAlign: 'center' }}
-          onClick={() => { onClose(); navigate('/login') }}>New here? Create an account</button>
+        <p className="m-muted" style={{ fontSize: '0.8rem', textAlign: 'center', margin: 0 }}>
+          No account? Ask your department admin to add you.
+        </p>
       </form>
     </SheetV3>
   )
