@@ -14,6 +14,9 @@ import { BookingsV3 } from './v3/BookingsV3'
 import { GroupsV3 } from './v3/GroupsV3'
 import { UsersV3 } from './v3/UsersV3'
 import { RequestsV3 } from './v3/RequestsV3'
+import { ResourcesV3 } from './v3/ResourcesV3'
+import { KindsV3 } from './v3/KindsV3'
+import { FeedbackInboxV3 } from './v3/FeedbackInboxV3'
 // Feedback is unchanged from v2 (no bottom sheet) — reused as-is.
 import { FeedbackScreen } from './mobile/pages/FeedbackScreen'
 
@@ -38,6 +41,10 @@ function AppV3() {
           <Route path="groups" element={<RequireAuth><GroupsV3 /></RequireAuth>} />
           <Route path="users" element={<RequireAuth><UsersV3 /></RequireAuth>} />
           <Route path="requests" element={<RequireAuth><RequestsV3 /></RequireAuth>} />
+          {/* admin areas — the API enforces admin-only; these just surface it */}
+          <Route path="rooms" element={<RequireAuth><ResourcesV3 /></RequireAuth>} />
+          <Route path="kinds" element={<RequireAuth><KindsV3 /></RequireAuth>} />
+          <Route path="feedback-inbox" element={<RequireAuth><FeedbackInboxV3 /></RequireAuth>} />
           <Route path="feedback" element={<RequireAuth><FeedbackScreen /></RequireAuth>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

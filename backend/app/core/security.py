@@ -1,18 +1,34 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing uses the `bcrypt` library DIRECTLY — not passlib.
+# Why: passlib 1.7.4 (its final release, 2020, now unmaintained) breaks on modern
+# bcrypt (>= 4.1 / 5.0). It reads the removed `bcrypt.__about__.__version__`, and its
+# backend self-test feeds a >72-byte string that bcrypt 5.0 rejects with a ValueError,
+# so passlib's bcrypt backend fails to initialise at all. bcrypt's own API is small
+# and stable, so we call it straight. Existing bcrypt hashes (incl. any made earlier
+# via passlib) still verify — they're standard bcrypt.
+#
+# bcrypt only ever uses the first 72 bytes of the password; bcrypt 5.0 raises instead
+# of silently truncating, so we truncate to 72 bytes ourselves to match that contract.
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+def _to72(password: str) -> bytes:
+    return password.encode("utf-8")[:72]
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(_to72(password), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return bcrypt.checkpw(_to72(plain_password), hashed_password.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

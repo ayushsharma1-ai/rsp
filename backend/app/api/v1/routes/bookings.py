@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.service import get_current_user, get_current_user_optional
+from app.modules.auth.service import get_current_user, get_current_user_optional, require_editor
 from app.modules.models import User, BookingStatus
 from app.modules.bookings.service import (
     BookingService, EventCreate, EventOut,
@@ -53,7 +53,7 @@ def cancel_occurrence(
     event_id: str,
     data: CancelOccurrenceRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     return BookingService(db).cancel_occurrence(
         root_event_id=event_id,
@@ -67,7 +67,7 @@ def edit_occurrence(
     event_id: str,
     data: EditOccurrenceRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     return BookingService(db).edit_occurrence(
         root_event_id=event_id,
@@ -92,7 +92,7 @@ def list_events(
 def create_event(
     data: EventCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     return BookingService(db).create_event_with_bookings(data, current_user)
 
@@ -100,7 +100,7 @@ def create_event(
 def create_recurring_event(
     data: RecurringEventCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     return BookingService(db).create_recurring_event(
         title=data.title,
@@ -114,13 +114,14 @@ def create_recurring_event(
         is_public=data.is_public,
         notes=data.notes,
         group_ids=data.group_ids,
+        event_kind_id=data.event_kind_id,
     )
 
 @events_router.delete("/{event_id}/series")
 def delete_series(
     event_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     """
     Delete an entire recurring series.
@@ -155,7 +156,7 @@ def update_event(
     event_id: str,
     data: UpdateEventRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     from app.modules.bookings.service import EventUpdate
     event_data = EventUpdate(
@@ -177,7 +178,7 @@ def cancel_event(
     event_id: str,
     data: CancelEventRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     return BookingService(db).cancel_event(
         event_id=event_id,
@@ -203,7 +204,7 @@ def review_booking(
     booking_id: str,
     new_status: BookingStatus,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     b = BookingService(db).review_booking(booking_id, new_status, current_user)
     return {"id": b.id, "status": b.status.value}
@@ -213,7 +214,7 @@ def review_booking(
 def cancel_booking(
     booking_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     b = BookingService(db).cancel_booking(booking_id, current_user)
     return {"id": b.id, "status": b.status.value}
@@ -224,7 +225,7 @@ def update_booking(
     booking_id: str,
     data: BookingUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_editor),
 ):
     b = BookingService(db).update_booking(booking_id, data, current_user)
     return {

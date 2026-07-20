@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { format } from 'date-fns'
-import { AlertTriangle, Globe, Lock } from 'lucide-react'
+import { format, addWeeks } from 'date-fns'
+import { AlertTriangle, Globe, Lock, Repeat } from 'lucide-react'
 import api from '../lib/api'
 import { Btn, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
@@ -13,6 +13,18 @@ const slotAfter = (value, steps) => {
   const i = TIME_SLOTS.findIndex(s => s.value === value)
   return TIME_SLOTS[Math.min((i < 0 ? 0 : i) + steps, TIME_SLOTS.length - 1)].value
 }
+// ---- recurrence helpers -------------------------------------------------
+// RRULE weekday codes, indexed by JS getDay() (0 = Sunday).
+const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+// Chips in Mon-first order, the way a timetable reads.
+const WEEK_CHIPS = [['MO', 'M'], ['TU', 'T'], ['WE', 'W'], ['TH', 'T'], ['FR', 'F'], ['SA', 'S'], ['SU', 'S']]
+const dayCodeOf = (dateStr) => RRULE_DAYS[new Date(`${dateStr}T00:00`).getDay()]
+const minutesBetween = (a, b) => {
+  const [ah, am] = a.split(':').map(Number)
+  const [bh, bm] = b.split(':').map(Number)
+  return (bh * 60 + bm) - (ah * 60 + am)
+}
+
 // Earliest slot that isn't in the past for `date`: today → round now up to :00/:30; otherwise 09:00.
 const futureDefaultStart = (date) => {
   const now = new Date()
@@ -35,6 +47,9 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
   const [kinds, setKinds] = useState([])
   const [kindId, setKindId] = useState(null)        // chosen event type → drives colour
   const [isPublic, setIsPublic] = useState(true)    // public = visible on the open calendar
+  const [repeat, setRepeat] = useState('none')      // 'none' | 'weekly'
+  const [byday, setByday] = useState([])            // ['MO','WE'] — weekly only
+  const [until, setUntil] = useState('')            // yyyy-MM-dd — last day of the series
   const [startT, setStartT] = useState(start || '09:00')
   const [endT, setEndT] = useState(end || '10:00')
   const [resources, setResources] = useState([])
@@ -53,6 +68,10 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     const e = (end && end > s) ? end : slotAfter(s, 2)    // default 1h, always after start
     setTitle(''); setVenue('601H-N'); setLink(''); setGroups([]); setIsPublic(true)
     setStartT(s); setEndT(e)
+    // default a weekly series to the chosen day, running ~a term (12 weeks)
+    setRepeat('none')
+    setByday([dayCodeOf(date)])
+    setUntil(format(addWeeks(new Date(`${date}T00:00`), 12), 'yyyy-MM-dd'))
     setError(''); setClashes([]); setRequested({})
     api.get('/resources').then(r => setResources(r.data)).catch(() => {})
     api.get('/groups').then(r => setRealGroups(r.data)).catch(() => {})
@@ -116,13 +135,37 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     if (endT <= startT) { setError('End time must be after start time.'); return }
     if (new Date(toISO(date, startT)) < new Date()) { setError("You can't create an event in the past."); return }
     if (isOnline && !link.trim()) { setError('Add a meeting link for the online event.'); return }
+    if (repeat === 'weekly') {
+      if (byday.length === 0) { setError('Pick at least one day to repeat on.'); return }
+      if (!until) { setError('Choose the date the series ends.'); return }
+      if (until < date) { setError('The series must end on or after the first date.'); return }
+    }
     setLoading(true)
     try {
       const startISO = toISO(date, startT), endISO = toISO(date, endT)
-      const bookings = mappedResource ? [{ resource_id: mappedResource.id, start_time: startISO, end_time: endISO, notes: '' }] : []
       const description = isOnline ? `Online meeting: ${link.trim()}` : ''
-      await api.post('/events', { title: title.trim(), description, start_time: startISO, end_time: endISO, is_public: isPublic, bookings, group_ids: groupIds, category: 'adhoc', event_kind_id: kindId })
-      haptic(12); snack('Event created'); onCreated && onCreated()
+
+      if (repeat === 'weekly') {
+        // A series: one root event + one rule + one booking template (no row explosion).
+        await api.post('/events/recurring', {
+          title: title.trim(),
+          description,
+          rrule: `FREQ=WEEKLY;BYDAY=${byday.join(',')}`,
+          series_start: startISO,
+          series_end_date: toISO(until, endT),
+          duration_minutes: minutesBetween(startT, endT),
+          resource_id: mappedResource ? mappedResource.id : null,
+          is_public: isPublic,
+          notes: '',
+          group_ids: groupIds,
+          event_kind_id: kindId,
+        })
+        haptic(12); snack('Recurring event created'); onCreated && onCreated()
+      } else {
+        const bookings = mappedResource ? [{ resource_id: mappedResource.id, start_time: startISO, end_time: endISO, notes: '' }] : []
+        await api.post('/events', { title: title.trim(), description, start_time: startISO, end_time: endISO, is_public: isPublic, bookings, group_ids: groupIds, category: 'adhoc', event_kind_id: kindId })
+        haptic(12); snack('Event created'); onCreated && onCreated()
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not create — that slot may be busy.')
     } finally { setLoading(false) }
@@ -159,6 +202,45 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
           <select className="m-input" value={endT} onChange={e => setEndT(e.target.value)}>
             {endSlots.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
+        </div>
+
+        <div>
+          <label className="m-label">Repeats</label>
+          <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
+            <button type="button" className={`m-chip ${repeat === 'none' ? 'm-chip--active' : ''}`}
+              onClick={() => { haptic(); setRepeat('none') }}>Does not repeat</button>
+            <button type="button" className={`m-chip ${repeat === 'weekly' ? 'm-chip--active' : ''}`}
+              onClick={() => { haptic(); setRepeat('weekly') }}>
+              <Repeat size={13} style={{ verticalAlign: '-2px', marginRight: 5 }} />Weekly
+            </button>
+          </div>
+
+          {repeat === 'weekly' && (
+            <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+              <div>
+                <div className="m-muted" style={{ fontSize: '0.78rem', marginBottom: 6 }}>On these days</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {WEEK_CHIPS.map(([code, label]) => (
+                    <button key={code} type="button"
+                      className={`m-chip ${byday.includes(code) ? 'm-chip--active' : ''}`}
+                      style={{ flex: 1, justifyContent: 'center', padding: '8px 0', minWidth: 0 }}
+                      onClick={() => { haptic(); setByday(d => d.includes(code) ? d.filter(x => x !== code) : [...d, code]) }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="m-muted" style={{ fontSize: '0.78rem', marginBottom: 6 }}>Until</div>
+                <input className="m-input" type="date" value={until} min={date}
+                  onChange={e => setUntil(e.target.value)} />
+              </div>
+              <div className="m-muted" style={{ fontSize: '0.76rem' }}>
+                Creates one series (e.g. a weekly class) — not dozens of separate events.
+                You can change or cancel a single occurrence later without touching the rest.
+              </div>
+            </div>
+          )}
         </div>
 
         <div>

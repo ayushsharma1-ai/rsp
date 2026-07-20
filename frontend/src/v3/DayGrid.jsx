@@ -131,7 +131,9 @@ export default function DayGrid({ cursor, today, events, eventColor, confirmLabe
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="v-iconbtn" onClick={() => setBox(null)} aria-label="Cancel"><X size={18} /></button>
-            <Btn variant="primary" onClick={() => onConfirm(hhmm(box.start), hhmm(box.end))}>{confirmLabel}</Btn>
+            {/* no onConfirm => read-only viewer: they can still inspect a slot's
+                free/busy state, but get no action button. */}
+            {onConfirm && <Btn variant="primary" onClick={() => onConfirm(hhmm(box.start), hhmm(box.end))}>{confirmLabel}</Btn>}
           </div>
         </div>
       )}

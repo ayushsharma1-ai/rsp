@@ -8,6 +8,14 @@ import SheetV3 from './SheetV3'
 const ROLES = ['admin', 'professor', 'staff', 'viewer']
 const DOMAIN = 'iitk.ac.in'
 
+// Shared by "Add member" and "Reset password". Avoids look-alike characters (0/O, 1/l).
+const randomPassword = (n = 12) => {
+  const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  let p = ''
+  for (let i = 0; i < n; i++) p += a[Math.floor(Math.random() * a.length)]
+  return p
+}
+
 export function UsersV3() {
   const snack = useSnack()
   const [users, setUsers] = useState(null)
@@ -61,18 +69,13 @@ function AddMemberSheet({ open, onClose, onCreated, snack }) {
     if (open) { setUsername(''); setFullName(''); setRole('professor'); setPassword(''); setError('') }
   }, [open])
 
-  const genPassword = () => {
-    const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
-    let p = ''
-    for (let i = 0; i < 10; i++) p += a[Math.floor(Math.random() * a.length)]
-    setPassword(p)
-  }
+  const genPassword = () => setPassword(randomPassword(12))
 
   const submit = async (e) => {
     e.preventDefault()
     if (!username.trim()) { setError('Enter a username.'); return }
     if (!fullName.trim()) { setError('Enter the full name.'); return }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     setLoading(true); setError('')
     try {
       await api.post('/users', {
@@ -123,8 +126,24 @@ function EditUserSheet({ user, onClose, onSaved, snack }) {
   const [active, setActive] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { if (user) { setRole(user.role); setActive(user.is_active); setError('') } }, [user])
+  const [newPw, setNewPw] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
+  const [pwMsg, setPwMsg] = useState('')
+  useEffect(() => {
+    if (user) { setRole(user.role); setActive(user.is_active); setError(''); setNewPw(''); setPwMsg('') }
+  }, [user])
   if (!user) return null
+
+  const resetPw = async () => {
+    if (newPw.length < 8) { setPwMsg('Password must be at least 8 characters.'); return }
+    setPwLoading(true); setPwMsg('')
+    try {
+      await api.post(`/users/${user.id}/password`, { new_password: newPw })
+      snack('Password reset')
+      setPwMsg(`✓ Done — share this with ${user.full_name}: ${newPw}`)
+    } catch (e) { setPwMsg(e.response?.data?.detail || 'Could not reset password.') }
+    finally { setPwLoading(false) }
+  }
 
   const save = async () => {
     setLoading(true); setError('')
@@ -150,6 +169,21 @@ function EditUserSheet({ user, onClose, onSaved, snack }) {
         </label>
         {error && <p className="m-error">{error}</p>}
         <Btn variant="primary" full loading={loading} onClick={save}>Save changes</Btn>
+
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+          <label className="m-label">Reset password</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="m-input" value={newPw} onChange={e => setNewPw(e.target.value)}
+              placeholder="New password" style={{ flex: 1, minWidth: 0 }} />
+            <Btn type="button" onClick={() => setNewPw(randomPassword(12))}>Generate</Btn>
+          </div>
+          <div className="m-muted" style={{ fontSize: '0.76rem', marginTop: 6 }}>
+            At least 8 characters. Share it with them — they can change it themselves from Settings.
+          </div>
+          {pwMsg && <p className={pwMsg.startsWith('✓') ? 'm-muted' : 'm-error'}
+            style={{ fontSize: '0.82rem', wordBreak: 'break-all' }}>{pwMsg}</p>}
+          <Btn full loading={pwLoading} onClick={resetPw} style={{ marginTop: 8 }}>Set new password</Btn>
+        </div>
       </div>
     </SheetV3>
   )

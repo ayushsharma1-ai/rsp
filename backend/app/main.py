@@ -1,7 +1,9 @@
 import logging
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -71,3 +73,12 @@ app.include_router(event_kinds.router,  prefix="/api/v1")
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# Single-process serving (no nginx): when SERVE_FRONTEND_DIR points at the built
+# frontend, uvicorn serves it too. Mounted LAST so /api/* and /health match first;
+# everything else falls through to the static files (index.html for "/"). v3 uses
+# hash routing, so no server-side SPA rewrite is needed.
+if settings.SERVE_FRONTEND_DIR and os.path.isdir(settings.SERVE_FRONTEND_DIR):
+    app.mount("/", StaticFiles(directory=settings.SERVE_FRONTEND_DIR, html=True), name="frontend")
+    logger.info(f"Serving frontend from {settings.SERVE_FRONTEND_DIR}")

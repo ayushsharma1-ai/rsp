@@ -81,6 +81,21 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def require_editor(current_user: User = Depends(get_current_user)) -> User:
+    """Any role allowed to CREATE or CHANGE things — i.e. everyone except Viewer.
+
+    Viewer is a read-only role: it can browse the calendar and open details, but
+    cannot create, edit, or cancel anything. Written as an explicit deny on VIEWER
+    (rather than an allow-list) so a new role added later is editable by default.
+    """
+    if current_user.role == UserRole.VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is view-only — ask an admin if you need edit access.",
+        )
+    return current_user
+
+
 class AuthService:
     def __init__(self, db: Session):
         self.db = db

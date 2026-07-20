@@ -62,6 +62,9 @@ export function CalendarV3() {
   const [sel, setSel] = useState(null)
   const [create, setCreate] = useState(null)          // {date, start, end}
   const [daySel, setDaySel] = useState(null)          // current day-grid slot {start,end} in HH:MM
+  // Viewers are read-only, so they get no create UI. Anonymous visitors DO still see
+  // the "+" — tapping it opens the login sheet, and they may be an editor once in.
+  const canEdit = !user || user.role !== 'viewer'
   const [moving, setMoving] = useState(null)
   const today = startOfDay(new Date())
   // Calendar is public to view; any write action routes through this — anonymous → a
@@ -122,7 +125,10 @@ export function CalendarV3() {
   const cancelEvt = async () => {
     const msg = sel.is_recurring ? 'Cancel just this occurrence?' : `Cancel “${sel.title}”?`
     if (!window.confirm(msg)) return
-    try { await api.post(`/events/${sel.id}/cancel`, sel.is_recurring ? { occurrence_date: sel.blockStart } : {}); snack('Cancelled'); setSel(null); load() }
+    // Occurrences are keyed by their ORIGINAL slot, so prefer occurrenceDate —
+    // blockStart is the moved time for an already-rescheduled occurrence and
+    // wouldn't match the series.
+    try { await api.post(`/events/${sel.id}/cancel`, sel.is_recurring ? { occurrence_date: sel.occurrenceDate || sel.blockStart } : {}); snack('Cancelled'); setSel(null); load() }
     catch (e) { snack(e.response?.data?.detail || 'Failed') }
   }
   const deleteSeries = async () => {
@@ -176,17 +182,20 @@ export function CalendarV3() {
       {view === 'week' && <WeekView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onPickDay={goDay} onEvent={openDetail} onPrev={stepBack} onNext={stepFwd} />}
       {view === 'day' && <DayView cursor={cursor} today={today} events={visible} eventColor={eventColor} loading={events === null} onBack={backFromDay} creating={!!create}
         onPrev={stepBack} onNext={stepFwd} onToday={() => setCursor(today)} onSelect={setDaySel}
-        onEvent={openDetail} onCreate={(start, end) => requireAuth(() => setCreate({ date: format(cursor, 'yyyy-MM-dd'), start, end }))} />}
+        onEvent={openDetail}
+        onCreate={canEdit ? (start, end) => requireAuth(() => setCreate({ date: format(cursor, 'yyyy-MM-dd'), start, end })) : null} />}
 
       {/* + creates at the SELECTED slot when the day grid has one; otherwise a
           sensible default (CreateEventV3 fills the next free time). On week/month
-          it first drops into the day so you can pick a time. */}
-      <button className="v-fab" aria-label="New event" onClick={() => requireAuth(() => {
-        haptic()
-        if (view !== 'day') { goDay(cursor); return }
-        const base = { date: format(cursor, 'yyyy-MM-dd') }
-        setCreate(daySel ? { ...base, start: daySel.start, end: daySel.end } : base)
-      })}><Plus size={24} /></button>
+          it first drops into the day so you can pick a time. Hidden for viewers. */}
+      {canEdit && (
+        <button className="v-fab" aria-label="New event" onClick={() => requireAuth(() => {
+          haptic()
+          if (view !== 'day') { goDay(cursor); return }
+          const base = { date: format(cursor, 'yyyy-MM-dd') }
+          setCreate(daySel ? { ...base, start: daySel.start, end: daySel.end } : base)
+        })}><Plus size={24} /></button>
+      )}
 
       <CreateEventV3 open={!!create} onClose={() => setCreate(null)} date={create?.date} start={create?.start} end={create?.end}
         onCreated={() => { setCreate(null); load(); loadVenues() }} />
@@ -336,7 +345,7 @@ function DayView({ cursor, today, events, eventColor, loading, onBack, onPrev, o
 
       <DayGrid cursor={cursor} today={today} events={events} eventColor={eventColor}
         confirmLabel="Add event" sheetOpen={creating} onEventTap={onEvent} onSelect={onSelect}
-        onConfirm={(s, e) => onCreate(s, e)} />
+        onConfirm={onCreate ? (s, e) => onCreate(s, e) : null} />
     </div>
   )
 }

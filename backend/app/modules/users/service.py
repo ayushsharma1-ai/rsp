@@ -4,8 +4,11 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from app.modules.models import User, UserRole, Notification
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.core.config import settings
+
+# Minimum length for any password we set (new member, self-change, or admin reset).
+MIN_PASSWORD_LEN = 8
 
 
 class UserOut(BaseModel):
@@ -30,6 +33,17 @@ class MemberCreate(BaseModel):
     full_name: str
     password: str
     role: UserRole = UserRole.PROFESSOR
+
+
+class PasswordChange(BaseModel):
+    """A member changing their OWN password — must prove they know the current one."""
+    current_password: str
+    new_password: str
+
+
+class PasswordReset(BaseModel):
+    """An admin setting a new password for someone (e.g. they forgot theirs)."""
+    new_password: str
 
 
 class NotificationOut(BaseModel):
@@ -60,8 +74,9 @@ class UserService:
             raise HTTPException(status_code=400, detail=f"Email must be a {domain} address")
         if not data.full_name.strip():
             raise HTTPException(status_code=400, detail="Full name is required")
-        if len(data.password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        if len(data.password) < MIN_PASSWORD_LEN:
+            raise HTTPException(status_code=400,
+                                detail=f"Password must be at least {MIN_PASSWORD_LEN} characters")
         if self.db.query(User).filter(User.email == email).first():
             raise HTTPException(status_code=409, detail="A user with this email already exists")
         user = User(
@@ -88,6 +103,27 @@ class UserService:
             setattr(u, field, value)
         self.db.commit()
         self.db.refresh(u)
+        return u
+
+    def _set_password(self, user: User, new_password: str) -> None:
+        if len(new_password or "") < MIN_PASSWORD_LEN:
+            raise HTTPException(status_code=400,
+                                detail=f"Password must be at least {MIN_PASSWORD_LEN} characters")
+        user.hashed_password = get_password_hash(new_password)
+        self.db.commit()
+
+    def change_own_password(self, user: User, data: 'PasswordChange') -> None:
+        """Self-service change. Requires the current password, so a stolen session
+        alone can't silently lock the real owner out."""
+        if not verify_password(data.current_password, user.hashed_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        self._set_password(user, data.new_password)
+
+    def admin_reset_password(self, user_id: str, new_password: str) -> User:
+        """Admin-only reset for a member who forgot their password. No current
+        password needed — the admin's own authentication is the authorisation."""
+        u = self.get_user(user_id)
+        self._set_password(u, new_password)
         return u
 
     def get_notifications(self, user_id: str, unread_only: bool = False) -> List[Notification]:

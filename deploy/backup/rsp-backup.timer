@@ -1,0 +1,13 @@
+[Unit]
+Description=Nightly RSP database backup
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+# If the VM was powered off at 02:00, run the backup at the next boot instead of
+# silently skipping the day (this is the big advantage over cron).
+Persistent=true
+# Spread the load a little if other jobs also fire at 02:00.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

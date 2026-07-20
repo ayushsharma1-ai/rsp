@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # in production this MUST be your real frontend origin(s).
     CORS_ORIGINS: str = "*"
 
+    # When set to the path of the built frontend (dist/), uvicorn also SERVES the
+    # frontend itself — no nginx needed. Used for the offline / single-process
+    # deployment. Leave empty in dev (Vite serves the frontend) and in the
+    # nginx-fronted setup (nginx serves the static files).
+    SERVE_FRONTEND_DIR: str = ""
+
     # SMTP (email). All optional; email no-ops if unset.
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

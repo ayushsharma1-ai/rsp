@@ -13,6 +13,7 @@ const TITLES = {
   '/': 'Calendar', '/notifications': 'Activity', '/settings': 'Settings',
   '/bookings': 'Bookings', '/requests': 'Slot Requests', '/feedback': 'Feedback',
   '/groups': 'Groups & Members', '/users': 'Users',
+  '/rooms': 'Rooms', '/kinds': 'Event Kinds', '/feedback-inbox': 'Feedback Inbox',
 }
 
 export default function AppShellV3() {

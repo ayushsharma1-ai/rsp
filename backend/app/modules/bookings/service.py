@@ -45,6 +45,7 @@ class RecurringEventCreate(BaseModel):
     is_public: bool = True
     notes: Optional[str] = None
     group_ids: List[str] = []          # Fix-4: cohorts this recurring series is for
+    event_kind_id: Optional[str] = None   # Class / Workshop / Talk — drives the colour
 
 class BookingCreate(BaseModel):
     resource_id: str
@@ -384,6 +385,7 @@ class BookingService:
         is_public: bool = True,
         notes: Optional[str] = None,
         group_ids: Optional[List[str]] = None,
+        event_kind_id: Optional[str] = None,   # Class / Workshop / Talk — drives the colour
     ) -> dict:
         """
         Creates a recurring event series.
@@ -458,6 +460,7 @@ class BookingService:
             recurrence_rule_id=rule_row.id,
             is_recurring_root=True,
             is_public=is_public,
+            event_kind_id=event_kind_id,
         )
         self.db.add(event)
         self.db.flush()   # get event.id

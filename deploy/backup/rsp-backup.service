@@ -1,0 +1,15 @@
+[Unit]
+Description=RSP database backup (pg_dump)
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+# Least privilege: the backup job is NOT root. Running as postgres also gives us
+# peer authentication over the local socket, so no password is needed.
+User=postgres
+Group=postgres
+ExecStart=/usr/local/bin/rsp-backup.sh
+# keep the job's own footprint small
+NoNewPrivileges=true
+PrivateTmp=true

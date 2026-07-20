@@ -5,7 +5,10 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.auth.service import get_current_user, require_admin
 from app.modules.models import User
-from app.modules.users.service import UserService, UserOut, UserUpdate, NotificationOut, MemberCreate
+from app.modules.users.service import (
+    UserService, UserOut, UserUpdate, NotificationOut, MemberCreate,
+    PasswordChange, PasswordReset,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -75,6 +78,18 @@ def mark_one_unread(
     UserService(db).set_notification_read(current_user.id, notif_id, False)
 
 
+# NOTE: declared BEFORE the "/{user_id}" routes so "me" isn't swallowed as a user id.
+# Uses get_current_user (not require_editor) — even a view-only member must be able
+# to change their own password.
+@router.post("/me/password", status_code=204)
+def change_my_password(
+    data: PasswordChange,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    UserService(db).change_own_password(current_user, data)
+
+
 @router.get("/{user_id}", response_model=UserOut)
 def get_user(
     user_id: str,
@@ -92,3 +107,13 @@ def update_user(
     current_user: User = Depends(require_admin),
 ):
     return UserService(db).update_user(user_id, data, current_user)
+
+
+@router.post("/{user_id}/password", status_code=204)
+def reset_user_password(
+    user_id: str,
+    data: PasswordReset,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),   # admin resets a forgotten password
+):
+    UserService(db).admin_reset_password(user_id, data.new_password)
