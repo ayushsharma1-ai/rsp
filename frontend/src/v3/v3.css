@@ -279,52 +279,59 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
    block to revert to the original styling.
    ============================================================ */
 :root {
-  /* Graphite & amber palette (minimalist) — redefined last so it overrides the
-     base indigo tokens everywhere. Warm graphite neutrals + a restrained gold. */
-  --brand: #e0a64a;
-  --brand-press: #cf9333;
-  --bg: #100f0d;
-  --surface: #1a1815;
-  --surface-2: #252119;
+  /* GALLERY × GRAPHITE — night mode. The warm graphite neutrals stay (identity
+     continuity); the accent becomes a periwinkle take on Klein blue (true IKB
+     dies on dark backgrounds). Amber survives as the warm secondary, carried by
+     event-kind colours and --accent-warm. */
+  --brand: #93a5ff;
+  --brand-press: #7d90f2;
+  --bg: #131211;
+  --surface: #1b1917;
+  --surface-2: #262219;
   --border: rgba(255,255,255,.11);
-  --text: #f1ede6;
-  --text-2: #b6ac9c;
-  --text-3: #847b6b;
-  --bar-bg: rgba(16,15,13,.82);
-  --link: #ecc16f;
-  --on-accent: #2a1f08;       /* dark text on the light amber accent */
-  --grad-brand: linear-gradient(135deg, #e7b25b 0%, #d4922f 100%);
-  --grad-brand-press: linear-gradient(135deg, #cf9333 0%, #b87d22 100%);
+  --text: #f0ece3;
+  --text-2: #b4ab9a;
+  --text-3: #83796a;
+  --bar-bg: rgba(19,18,17,.82);
+  --link: #b3c0ff;
+  --accent-warm: #e0a64a;
+  --on-accent: #10143c;       /* deep navy text on the light periwinkle accent */
+  --grad-brand: linear-gradient(135deg, #a3b2ff 0%, #7d90f2 100%);
+  --grad-brand-press: linear-gradient(135deg, #7d90f2 0%, #6a7de6 100%);
   --ease: cubic-bezier(.2,.8,.2,1);
   --elev-1: 0 1px 2px rgba(0,0,0,.5);
   --elev-2: 0 8px 26px rgba(0,0,0,.45);
   --elev-3: 0 24px 64px rgba(0,0,0,.6);
-  --glow-brand: 0 5px 18px rgba(224,166,74,.28);
+  --glow-brand: 0 5px 18px rgba(147,165,255,.22);
   --hairline: inset 0 1px 0 rgba(255,255,255,.06);
-  --ring-focus: 0 0 0 3px rgba(224,166,74,.30);
+  --ring-focus: 0 0 0 3px rgba(147,165,255,.30);
   --surface-hi: rgba(255,255,255,.04);
 }
 [data-theme="light"] {
-  --brand: #9a6a12;           /* deep gold — readable as text on light too */
-  --brand-press: #855a0c;
-  --bg: #f7f5f1;
-  --surface: #ffffff;
-  --surface-2: #f0ebe2;
-  --border: rgba(40,30,15,.12);
-  --text: #1c1a16;
-  --text-2: #6b6457;
-  --text-3: #9a9182;
-  --bar-bg: rgba(255,253,250,.86);
-  --link: #855a0c;
-  --on-accent: #ffffff;       /* white text on the deep-gold accent */
-  --grad-brand: linear-gradient(135deg, #a9761a 0%, #8c5f0e 100%);
-  --grad-brand-press: linear-gradient(135deg, #855a0c 0%, #6f4a08 100%);
-  --elev-1: 0 1px 2px rgba(40,30,15,.10);
-  --elev-2: 0 10px 26px rgba(40,30,15,.10);
-  --elev-3: 0 24px 64px rgba(40,30,15,.16);
-  --glow-brand: 0 8px 20px rgba(154,106,18,.20);
-  --hairline: inset 0 1px 0 rgba(255,255,255,.8);
-  --ring-focus: 0 0 0 3px rgba(154,106,18,.18);
+  /* GALLERY day mode — warm paper, warm ink, and International Klein Blue as
+     the single high-saturation accent (the documented pairing: IKB + creamy
+     white + charcoal). Ochre is the warm secondary. */
+  --brand: #002fa7;
+  --brand-press: #00257f;
+  --bg: #f7f4ec;
+  --surface: #fffdf7;
+  --surface-2: #efe9dc;
+  --border: rgba(32,27,18,.13);
+  --text: #1b1813;
+  --text-2: #6d665a;
+  --text-3: #9d947f;
+  --bar-bg: rgba(250,247,240,.86);
+  --link: #1f3fd0;
+  --accent-warm: #a8741c;
+  --on-accent: #ffffff;       /* white text on Klein blue */
+  --grad-brand: linear-gradient(135deg, #0d3cbe 0%, #002fa7 100%);
+  --grad-brand-press: linear-gradient(135deg, #00257f 0%, #001c62 100%);
+  --elev-1: 0 1px 2px rgba(42,35,20,.10);
+  --elev-2: 0 10px 26px rgba(42,35,20,.10);
+  --elev-3: 0 24px 64px rgba(42,35,20,.16);
+  --glow-brand: 0 8px 20px rgba(0,47,167,.18);
+  --hairline: inset 0 1px 0 rgba(255,255,255,.85);
+  --ring-focus: 0 0 0 3px rgba(0,47,167,.18);
   --surface-hi: rgba(255,255,255,.7);
 }
 
@@ -424,3 +431,17 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
   .m-snackbar { left: 240px; right: 0; margin-inline: auto; max-width: 460px; transform: none; }
   .v-selbar { left: calc(240px + 24px); right: 24px; bottom: 24px; }
 }
+
+/* ============================================================
+   GALLERY TYPE LAYER — an editorial serif (Fraunces) for the big
+   display moments only; DM Sans remains the UI/body face. Appended
+   last so it overrides the earlier Syne/DM Sans heading rules.
+   ============================================================ */
+.v-topbar__title, .v-cal-title, .m-sheet__title, .v-dayhead__num, .v-sidebar__name {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.v-topbar__title { font-size: 1.45rem; }
+.v-sidebar__logo { font-family: 'Fraunces', Georgia, serif; font-weight: 600; }
+.m-sheet__title { font-size: 1.3rem; }

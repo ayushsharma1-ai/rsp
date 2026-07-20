@@ -134,7 +134,7 @@ function MoveDayPicker({ req, onClose, onConfirm }) {
 
       <div className="v-moveoverlay__body">
         <DayGrid cursor={day} today={new Date()} events={events || []}
-          eventColor={(e) => e.kind_color || e.color || '#9c7b59'} confirmLabel="Move here" onConfirm={submit} />
+          eventColor={(e) => e.kind_color || e.color || '#a0824f'} confirmLabel="Move here" onConfirm={submit} />
       </div>
     </div>,
     document.body,

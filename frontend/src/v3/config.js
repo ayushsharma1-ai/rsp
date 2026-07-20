@@ -1,21 +1,29 @@
-// v3 fixed pick-lists (per spec) + best-effort mapping onto real backend rows.
-// The labels are fixed; we map them to actual /resources and /groups by name so
-// bookings + clash detection still work against the live API.
+// NOTE (2026-07-20): these lists are NO LONGER the source of truth for what
+// exists. Rooms and groups are now read live from /resources and /groups, and
+// picked by id — see CreateEventV3 / CalendarV3.
+//
+// They used to be fixed pick-lists "best-effort mapped" onto backend rows by
+// name. That failed SILENTLY on a fresh database: no match meant the event was
+// created with no room booking at all, so two people could both "book" the same
+// room and never be warned. Do not reintroduce that pattern.
+//
+// VENUES survives only as a COLOUR LOOKUP for known room names (see
+// venueColorForName). GROUPS is unused and kept for reference only.
 
 // Room colours — muted, warm-leaning tones tuned to the graphite & amber theme
 // (distinct from the event-kind colours; readableOn() keeps text legible on each).
 export const VENUES = [
-  { key: '601H-N', label: '601H-N', sub: 'Computer room', color: '#5f7aa6', online: false },
-  { key: '601H-O', label: '601H-O', sub: 'Classroom', color: '#7c8c54', online: false },
-  { key: '601H-P', label: '601H-P', sub: 'Classroom', color: '#8a6f9c', online: false },
-  { key: 'online', label: 'Online', sub: 'Add a meeting link', color: '#9c7b59', online: true },
+  { key: '601H-N', label: '601H-N', sub: 'Computer room', color: '#5c6fb0', online: false },
+  { key: '601H-O', label: '601H-O', sub: 'Classroom', color: '#74804b', online: false },
+  { key: '601H-P', label: '601H-P', sub: 'Classroom', color: '#86648f', online: false },
+  { key: 'online', label: 'Online', sub: 'Add a meeting link', color: '#a0824f', online: true },
 ]
 
 // Cohesive category palette for the graphite & amber theme — muted, mid-tone,
 // readable in both light and dark.
 export const EVENT_COLORS = [
-  '#d99a4e', '#c06a43', '#7c8c54', '#4f8a80',
-  '#5f7aa6', '#8a6f9c', '#9c7b59', '#b0894a',
+  '#a8741c', '#b3603c', '#74804b', '#4f8a80',
+  '#3d56c5', '#86648f', '#a0824f', '#8a8276',
 ]
 
 export const GROUPS = [
@@ -46,7 +54,7 @@ export function groupIdForLabel(label, groups) {
 
 // Color used for an event, looked up from its venue/resource name.
 export function venueColorForName(resourceName) {
-  if (!resourceName) return '#9c7b59' // online / unspecified (warm taupe)
+  if (!resourceName) return '#a0824f' // online / unspecified (ochre taupe)
   const n = norm(resourceName)
   const v = VENUES.find(x => !x.online && n.includes(norm(x.key)))
   return v ? v.color : '#8a8276'      // other / unmatched (warm gray)

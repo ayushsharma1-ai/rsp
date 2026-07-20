@@ -1,13 +1,13 @@
 {
-  "name": "RSP Scheduler",
+  "name": "RSP — Resource Scheduling Platform",
   "short_name": "RSP",
-  "description": "Resource Scheduling Platform — rooms, labs, events.",
-  "start_url": "/mobile.html",
+  "description": "Department scheduling — rooms, classes, events.",
+  "start_url": "/v3.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0b0d12",
-  "theme_color": "#5b6ef5",
+  "background_color": "#f7f4ec",
+  "theme_color": "#002fa7",
   "icons": [
     { "src": "/icon.svg", "sizes": "192x192 512x512 any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]

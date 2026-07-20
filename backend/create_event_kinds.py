@@ -18,9 +18,9 @@ from app.modules import models  # noqa: F401 — registers all models on Base
 from app.modules.models import EventKind
 
 SEED = [
-    ("Class", "#d99a4e"),     # amber / gold (matches the accent)
+    ("Class", "#a8741c"),     # ochre — the gallery theme's warm secondary
     ("Workshop", "#4f8a80"),  # muted teal
-    ("Talk", "#c06a43"),      # terracotta
+    ("Talk", "#b3603c"),      # terracotta
 ]
 
 
