@@ -19,7 +19,8 @@ from app.core.recurrence import check_recurring_conflict, expand_rrule
 
 from app.modules.models import (
     Booking, BookingStatus, Resource, Event, User, AuditLog,
-    Notification, NotificationType, EventStatus, EventGroup, EventCategory, EventKind
+    Notification, NotificationType, EventStatus, EventGroup, EventCategory, EventKind,
+    Group,
 )
 from app.core.events import bus
 from app.modules.availability.service import AvailabilityService
@@ -1202,6 +1203,15 @@ def _get_event_detail(self, event_id: str, actor: 'User') -> dict:
 
     organizer = self.db.query(User).filter(User.id == event.organizer_id).first()
 
+    # Which cohorts this event is for. Tagged at creation but previously never
+    # returned, so the UI could set groups and then never show them again.
+    group_rows = (
+        self.db.query(Group.id, Group.name)
+        .join(EventGroup, EventGroup.group_id == Group.id)
+        .filter(EventGroup.event_id == event.id)
+        .all()
+    )
+
     return {
         "id":           event.id,
         "title":        event.title,
@@ -1217,6 +1227,8 @@ def _get_event_detail(self, event_id: str, actor: 'User') -> dict:
         "event_kind_id": event.event_kind_id,
         "kind_name":    event.event_kind.name if event.event_kind else None,
         "kind_color":   event.event_kind.color if event.event_kind else None,
+        "group_ids":    [g.id for g in group_rows],
+        "group_names":  [g.name for g in group_rows],
         "bookings":     bookings,
     }
 
@@ -1238,6 +1250,12 @@ def _get_calendar_events(self, actor, start, end):
 
     result = []
     is_anon = actor is None        # anonymous (public) viewer — no logged-in user
+
+    # event_id -> [group ids], fetched in ONE query so the calendar can be
+    # filtered by cohort without an N+1 lookup per event.
+    groups_by_event = {}
+    for _eid, _gid in self.db.query(EventGroup.event_id, EventGroup.group_id).all():
+        groups_by_event.setdefault(_eid, []).append(_gid)
 
     # Helper — strips timezone info and normalises to UTC naive datetime
     # Used for reliable datetime comparison regardless of how
@@ -1293,6 +1311,7 @@ def _get_calendar_events(self, actor, start, end):
             "color":            e.color,
             "kind_name":        e.event_kind.name if e.event_kind else None,
             "kind_color":       e.event_kind.color if e.event_kind else None,
+            "group_ids":        groups_by_event.get(e.id, []),
             "is_recurring":     False,
             "is_exception":     False,
         })
@@ -1392,6 +1411,7 @@ def _get_calendar_events(self, actor, start, end):
                     "color":            exception.color or root_event.color,
                     "kind_name":        root_event.event_kind.name if root_event.event_kind else None,
                     "kind_color":       root_event.event_kind.color if root_event.event_kind else None,
+                    "group_ids":        groups_by_event.get(root_event.id, []),
                     "is_recurring":     True,
                     "is_exception":     True,
                     "original_time":    occ_start,
@@ -1417,6 +1437,7 @@ def _get_calendar_events(self, actor, start, end):
                     "color":            root_event.color,
                     "kind_name":        root_event.event_kind.name if root_event.event_kind else None,
                     "kind_color":       root_event.event_kind.color if root_event.event_kind else None,
+                    "group_ids":        groups_by_event.get(root_event.id, []),
                     "is_recurring":     True,
                     "is_exception":     False,
                     "rrule":            rule.rrule,

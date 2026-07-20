@@ -12,7 +12,7 @@ import { useAuthStore } from '../store/authStore'
 import { Btn, DetailRow, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
 import { haptic } from '../mobile/theme'
-import { VENUES, venueColorForName, readableOn } from './config'
+import { venueColorForName, readableOn } from './config'
 import { useAutoRefresh } from './useAutoRefresh'
 import { useAuthGate } from './AuthGateV3'
 import CreateEventV3 from './CreateEventV3'
@@ -23,13 +23,14 @@ import { DAY_START, DAY_END, WK_PX, evMins, scrollToHour } from './dayConsts'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-const venueKeyForName = (name) => {
-  if (!name) return 'online'
-  const n = (name || '').toLowerCase().replace(/0/g, 'o').replace(/[^a-z0-9]/g, '')
-  const v = VENUES.find(x => !x.online && n.includes(x.key.toLowerCase().replace(/0/g, 'o').replace(/[^a-z0-9]/g, '')))
-  return v ? v.key : 'other'
-}
-const colorByVenueKey = (key) => (VENUES.find(v => v.key === key)?.color) || '#8a8276'
+// Filters are built from the REAL rooms (/resources), so a room added in
+// Settings > Rooms shows up here automatically. Events carry their room name,
+// so we filter by exact name — no fuzzy matching, no "other" bucket.
+// This sentinel covers events with no room at all (online / unassigned).
+const NO_ROOM = '__no_room__'
+// Same idea for cohorts: filter the calendar down to one group's timetable.
+// Sentinel covers events not tagged to any group.
+const NO_GROUP = '__no_group__'
 
 export function CalendarV3() {
   const { user } = useAuthStore()
@@ -58,7 +59,10 @@ export function CalendarV3() {
   const setCursor = (updater) => go(view, typeof updater === 'function' ? updater(cursor) : updater)
   const [events, setEvents] = useState(null)
   const [venueByEvent, setVenueByEvent] = useState({})
-  const [active, setActive] = useState(() => new Set([...VENUES.map(v => v.key), 'other']))
+  const [rooms, setRooms] = useState([])                       // real rooms from /resources
+  const [active, setActive] = useState(() => new Set([NO_ROOM]))
+  const [groupList, setGroupList] = useState([])               // real cohorts from /groups
+  const [activeGroups, setActiveGroups] = useState(() => new Set([NO_GROUP]))
   const [sel, setSel] = useState(null)
   const [create, setCreate] = useState(null)          // {date, start, end}
   const [daySel, setDaySel] = useState(null)          // current day-grid slot {start,end} in HH:MM
@@ -89,6 +93,20 @@ export function CalendarV3() {
       .then(r => setEvents(r.data.map(e => ({ ...e, occurrenceDate: e.original_time || e.start }))))
       .catch(() => setEvents(prev => prev || []))
   }, [range])
+  // Fetch the real room list once — it's a few hundred bytes and rooms change
+  // rarely, so this is far cheaper than the event fetch that already runs.
+  useEffect(() => {
+    api.get('/resources').then(r => {
+      const list = (r.data || []).filter(x => x.is_active !== false)
+      setRooms(list)
+      setActive(prev => { const n = new Set(prev); list.forEach(x => n.add(x.name)); return n })
+    }).catch(() => {})
+    api.get('/groups').then(r => {
+      const list = r.data || []
+      setGroupList(list)
+      setActiveGroups(prev => { const n = new Set(prev); list.forEach(g => n.add(g.id)); return n })
+    }).catch(() => {})
+  }, [])
   useEffect(() => { loadVenues() }, [loadVenues])
   useEffect(() => { load() }, [load])
   // Pick up other users' changes without a manual reload (poll + on-focus).
@@ -110,10 +128,21 @@ export function CalendarV3() {
     return () => { cancelled = true }
   }, [sp.get('event')]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const eventVenue = (e) => venueKeyForName(venueByEvent[e.id])
+  const eventVenue = (e) => venueByEvent[e.id] || NO_ROOM
   const eventColor = (e) => e.kind_color || e.color || venueColorForName(venueByEvent[e.id])
-  const visible = (events || []).filter(e => active.has(eventVenue(e)))
+  // An event passes the cohort filter if ANY of its groups is switched on
+  // (untagged events fall under the NO_GROUP chip).
+  const matchesGroup = (e) => {
+    if (groupList.length === 0) return true
+    const gs = e.group_ids || []
+    return gs.length === 0 ? activeGroups.has(NO_GROUP) : gs.some(id => activeGroups.has(id))
+  }
+  // Until the lists have loaded (or if none exist), don't hide anything —
+  // otherwise events would briefly vanish while the fetch is in flight.
+  const visible = (events || []).filter(e =>
+    (rooms.length === 0 || active.has(eventVenue(e))) && matchesGroup(e))
   const toggleFilter = (key) => setActive(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  const toggleGroupFilter = (id) => setActiveGroups(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const openDetail = async (e) => {
     haptic()
@@ -165,16 +194,46 @@ export function CalendarV3() {
         </>
       )}
 
-      {view === 'month' && (
+      {/* Cohort filter — "show me MDes 1st year's timetable". Useful in week view
+          too, so it isn't limited to the month like the room filter. */}
+      {view !== 'day' && groupList.length > 0 && (
         <div className="v-filters">
-          {VENUES.map(v => {
-            const on = active.has(v.key)
+          {groupList.map(g => {
+            const on = activeGroups.has(g.id)
             return (
-              <button key={v.key} className={`v-filter ${on ? 'v-filter--on' : ''}`} onClick={() => { haptic(); toggleFilter(v.key) }} style={on ? { borderColor: v.color } : {}}>
-                <span className="v-filter__dot" style={{ background: on ? v.color : 'var(--text-3)' }} />{v.label}
+              <button key={g.id} className={`v-filter ${on ? 'v-filter--on' : ''}`}
+                onClick={() => { haptic(); toggleGroupFilter(g.id) }}>
+                <span className="v-filter__dot" style={{ background: on ? 'var(--brand)' : 'var(--text-3)' }} />{g.name}
               </button>
             )
           })}
+          <button className={`v-filter ${activeGroups.has(NO_GROUP) ? 'v-filter--on' : ''}`}
+            onClick={() => { haptic(); toggleGroupFilter(NO_GROUP) }}>
+            <span className="v-filter__dot" style={{ background: activeGroups.has(NO_GROUP) ? 'var(--brand)' : 'var(--text-3)' }} />No group
+          </button>
+        </div>
+      )}
+
+      {view === 'month' && rooms.length > 0 && (
+        <div className="v-filters">
+          {rooms.map(r => {
+            const on = active.has(r.name)
+            const c = venueColorForName(r.name)
+            return (
+              <button key={r.id} className={`v-filter ${on ? 'v-filter--on' : ''}`} onClick={() => { haptic(); toggleFilter(r.name) }} style={on ? { borderColor: c } : {}}>
+                <span className="v-filter__dot" style={{ background: on ? c : 'var(--text-3)' }} />{r.name}
+              </button>
+            )
+          })}
+          {(() => {
+            const on = active.has(NO_ROOM)
+            const c = venueColorForName(null)
+            return (
+              <button key={NO_ROOM} className={`v-filter ${on ? 'v-filter--on' : ''}`} onClick={() => { haptic(); toggleFilter(NO_ROOM) }} style={on ? { borderColor: c } : {}}>
+                <span className="v-filter__dot" style={{ background: on ? c : 'var(--text-3)' }} />Online
+              </button>
+            )
+          })()}
         </div>
       )}
 
@@ -211,6 +270,8 @@ export function CalendarV3() {
               <DetailRow label="End" value={format(parseISO(sel.blockEnd || sel.end_time), 'HH:mm')} />
               {sel.organizer_name && <DetailRow label="Organizer" value={sel.organizer_name} />}
               {(sel.bookings || []).length > 0 && <DetailRow label="Venue" value={sel.bookings.map(b => b.resource_name).join(', ')} />}
+              {sel.kind_name && <DetailRow label="Kind" value={sel.kind_name} />}
+              {(sel.group_names || []).length > 0 && <DetailRow label="For" value={sel.group_names.join(', ')} />}
               <Btn full variant="ghost" style={{ marginTop: 14 }} onClick={() => {
                 const how = addToCalendar({
                   id: sel.id, title: sel.title, description: sel.description,

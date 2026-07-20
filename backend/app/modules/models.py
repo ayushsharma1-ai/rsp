@@ -68,6 +68,28 @@ class User(Base):
     audit_logs = relationship("AuditLog", back_populates="actor")
 
 
+class RefreshToken(Base):
+    """
+    A long-lived, REVOCABLE credential used only to mint fresh short-lived access
+    tokens (see POST /auth/refresh). It is the counterpart to the stateless JWT
+    access token, which the server cannot un-issue.
+
+    We store the SHA-256 HASH of the token, never the token itself — exactly like a
+    password. So even if this table leaks, an attacker cannot use the rows to log in.
+    Logout / "log out everywhere" simply flips `revoked` to True.
+    """
+    __tablename__ = "refresh_tokens"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)  # sha256 hex = 64 chars
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    user = relationship("User")
+
+
 # ─────────────────────────────────────────────
 # RESOURCES MODULE
 # ─────────────────────────────────────────────

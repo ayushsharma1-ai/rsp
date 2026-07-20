@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.service import get_current_user, require_editor
+from app.modules.auth.service import get_current_user, require_admin
 from app.modules.models import User
 from app.modules.groups.service import (
     GroupService, GroupCreate, GroupOut, GroupDetail,
@@ -26,7 +26,7 @@ def list_groups(db: Session = Depends(get_db), current_user: User = Depends(get_
 
 @groups_router.post("", response_model=GroupOut, status_code=201)
 def create_group(data: GroupCreate, db: Session = Depends(get_db),
-                 current_user: User = Depends(require_editor)):
+                 current_user: User = Depends(require_admin)):
     return GroupService(db).create_group(data)
 
 
@@ -38,19 +38,19 @@ def get_group(group_id: str, db: Session = Depends(get_db),
 
 @groups_router.delete("/{group_id}", status_code=204)
 def delete_group(group_id: str, db: Session = Depends(get_db),
-                 current_user: User = Depends(require_editor)):
+                 current_user: User = Depends(require_admin)):
     GroupService(db).delete_group(group_id)
 
 
 @groups_router.post("/{group_id}/members/{person_id}", status_code=204)
 def add_member(group_id: str, person_id: str, db: Session = Depends(get_db),
-               current_user: User = Depends(require_editor)):
+               current_user: User = Depends(require_admin)):
     GroupService(db).add_member(group_id, person_id)
 
 
 @groups_router.delete("/{group_id}/members/{person_id}", status_code=204)
 def remove_member(group_id: str, person_id: str, db: Session = Depends(get_db),
-                  current_user: User = Depends(require_editor)):
+                  current_user: User = Depends(require_admin)):
     GroupService(db).remove_member(group_id, person_id)
 
 
@@ -62,7 +62,7 @@ def list_roster(db: Session = Depends(get_db), current_user: User = Depends(get_
 
 @roster_router.post("", response_model=RosterPersonOut, status_code=201)
 def create_person(data: RosterPersonCreate, db: Session = Depends(get_db),
-                  current_user: User = Depends(require_editor)):
+                  current_user: User = Depends(require_admin)):
     return GroupService(db).create_roster_person(data)
 
 

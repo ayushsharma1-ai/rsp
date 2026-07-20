@@ -6,7 +6,13 @@ import { Btn, useSnack } from '../mobile/ui'
 import { TIME_SLOTS, toISO } from '../mobile/lib'
 import { haptic } from '../mobile/theme'
 import SheetV3 from './SheetV3'
-import { VENUES, GROUPS, resourceForVenue, groupIdForLabel } from './config'
+import { venueColorForName } from './config'
+
+// The venue list is built from the REAL rooms in the database (/resources), not a
+// hardcoded list. A fixed list could drift from reality and — because the old
+// name-matching failed silently — you could "book" a room that was never reserved.
+// 'online' is the one pseudo-venue that has no room behind it.
+const ONLINE = 'online'
 
 // The TIME_SLOTS value `steps` half-hours after `value` (clamped to the last slot).
 const slotAfter = (value, steps) => {
@@ -41,7 +47,7 @@ const futureDefaultStart = (date) => {
 export default function CreateEventV3({ open, onClose, onCreated, date, start, end }) {
   const snack = useSnack()
   const [title, setTitle] = useState('')
-  const [venue, setVenue] = useState('601H-N')
+  const [venue, setVenue] = useState('')   // a real resource id, or ONLINE
   const [link, setLink] = useState('')
   const [groups, setGroups] = useState([])
   const [kinds, setKinds] = useState([])
@@ -66,7 +72,7 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     let s = start || floor
     if (s < floor) s = floor                              // never default into the past
     const e = (end && end > s) ? end : slotAfter(s, 2)    // default 1h, always after start
-    setTitle(''); setVenue('601H-N'); setLink(''); setGroups([]); setIsPublic(true)
+    setTitle(''); setVenue(''); setLink(''); setGroups([]); setIsPublic(true)
     setStartT(s); setEndT(e)
     // default a weekly series to the chosen day, running ~a term (12 weeks)
     setRepeat('none')
@@ -81,10 +87,20 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     }).catch(() => {})
   }, [open, start, end, date])
 
-  const venueObj = VENUES.find(v => v.key === venue)
-  const isOnline = !!venueObj?.online
-  const mappedResource = !isOnline ? resourceForVenue(venueObj, resources) : null
-  const groupIds = groups.map(k => groupIdForLabel(GROUPS.find(g => g.key === k).label, realGroups)).filter(Boolean)
+  // Real, bookable rooms straight from the API — no name-matching, no drift.
+  const rooms = resources.filter(r => r.is_active !== false)
+  const isOnline = venue === ONLINE
+  const mappedResource = isOnline ? null : (rooms.find(r => r.id === venue) || null)
+  // `groups` holds REAL group ids straight from /groups — no name-matching.
+  const groupIds = groups
+
+  // Once the real rooms arrive, select a sensible default — the first bookable
+  // room, or Online if the department hasn't added any rooms yet. Also repairs a
+  // selection that no longer exists (e.g. the room was deactivated).
+  useEffect(() => {
+    if (!open) return
+    setVenue(v => (v === ONLINE || rooms.some(r => r.id === v)) ? v : (rooms[0]?.id || ONLINE))
+  }, [open, resources]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // live clash preview (venue only)
   useEffect(() => {
@@ -101,9 +117,9 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
 
   // Only venue clashes matter now (student clashes are ignored).
   const venueClashes = clashes.filter(c => c.venue_clash)
-  const allGroupsOn = groups.length === GROUPS.length
-  const toggleGroup = (k) => setGroups(g => g.includes(k) ? g.filter(x => x !== k) : [...g, k])
-  const toggleAll = () => setGroups(allGroupsOn ? [] : GROUPS.map(g => g.key))
+  const allGroupsOn = realGroups.length > 0 && groups.length === realGroups.length
+  const toggleGroup = (id) => setGroups(g => g.includes(id) ? g.filter(x => x !== id) : [...g, id])
+  const toggleAll = () => setGroups(allGroupsOn ? [] : realGroups.map(g => g.id))
 
   const sendRequest = async (vb) => {
     if (sending) return
@@ -135,6 +151,14 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
     if (endT <= startT) { setError('End time must be after start time.'); return }
     if (new Date(toISO(date, startT)) < new Date()) { setError("You can't create an event in the past."); return }
     if (isOnline && !link.trim()) { setError('Add a meeting link for the online event.'); return }
+    // Fail LOUDLY rather than silently creating an event that reserves no room —
+    // that was the old bug: two people could "book" the same room and never be told.
+    if (!isOnline && !mappedResource) {
+      setError(rooms.length === 0
+        ? 'No rooms exist yet, so nothing can be reserved. An admin must add rooms first (Settings > Rooms).'
+        : 'Choose a room for this event.')
+      return
+    }
     if (repeat === 'weekly') {
       if (byday.length === 0) { setError('Pick at least one day to repeat on.'); return }
       if (!until) { setError('Choose the date the series ends.'); return }
@@ -245,14 +269,32 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
 
         <div>
           <label className="m-label">Venue</label>
+          {resources.length === 0 ? (
+            <div className="v-clash" style={{ marginTop: 0 }}>
+              <div className="v-clash__head"><AlertTriangle size={16} /> No rooms added yet</div>
+              <div style={{ fontSize: '0.84rem', marginTop: 4 }}>
+                Nothing can be reserved until an admin adds rooms under <strong>Settings &rsaquo; Rooms</strong>.
+                You can still create an <strong>Online</strong> event.
+              </div>
+            </div>
+          ) : null}
           <div className="v-pickgrid">
-            {VENUES.map(v => (
-              <button key={v.key} type="button" className={`v-pick ${venue === v.key ? 'v-pick--on' : ''}`}
-                onClick={() => { haptic(); setVenue(v.key) }}>
-                <span className="v-pick__label"><span className="v-pick__dot" style={{ background: v.color }} />{v.label}</span>
-                <span className="v-pick__sub">{v.sub}</span>
+            {rooms.map(r => (
+              <button key={r.id} type="button" className={`v-pick ${venue === r.id ? 'v-pick--on' : ''}`}
+                onClick={() => { haptic(); setVenue(r.id) }}>
+                <span className="v-pick__label">
+                  <span className="v-pick__dot" style={{ background: venueColorForName(r.name) }} />{r.name}
+                </span>
+                <span className="v-pick__sub">{r.location || r.description || 'Room'}</span>
               </button>
             ))}
+            <button type="button" className={`v-pick ${isOnline ? 'v-pick--on' : ''}`}
+              onClick={() => { haptic(); setVenue(ONLINE) }}>
+              <span className="v-pick__label">
+                <span className="v-pick__dot" style={{ background: venueColorForName(null) }} />Online
+              </span>
+              <span className="v-pick__sub">Add a meeting link</span>
+            </button>
           </div>
         </div>
 
@@ -265,13 +307,19 @@ export default function CreateEventV3({ open, onClose, onCreated, date, start, e
 
         <div>
           <label className="m-label">Groups</label>
-          <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
-            <button type="button" className={`m-chip ${allGroupsOn ? 'm-chip--active' : ''}`} onClick={() => { haptic(); toggleAll() }}>Select all</button>
-            {GROUPS.map(g => (
-              <button key={g.key} type="button" className={`m-chip ${groups.includes(g.key) ? 'm-chip--active' : ''}`}
-                onClick={() => { haptic(); toggleGroup(g.key) }}>{g.label}</button>
-            ))}
-          </div>
+          {realGroups.length === 0 ? (
+            <div className="m-muted" style={{ fontSize: '0.82rem' }}>
+              No groups exist yet — an admin can create them under <strong>Groups &amp; Members</strong>.
+            </div>
+          ) : (
+            <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible' }}>
+              <button type="button" className={`m-chip ${allGroupsOn ? 'm-chip--active' : ''}`} onClick={() => { haptic(); toggleAll() }}>Select all</button>
+              {realGroups.map(g => (
+                <button key={g.id} type="button" className={`m-chip ${groups.includes(g.id) ? 'm-chip--active' : ''}`}
+                  onClick={() => { haptic(); toggleGroup(g.id) }}>{g.name}</button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>

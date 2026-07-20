@@ -1,27 +1,64 @@
 import axios from 'axios'
 
-// const api = axios.create({ baseURL: '/api/v1' })
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1'
 })
 
+// Attach the current access token to every request.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
+// ── Silent access-token refresh ──────────────────────────────────────────────
+// When a request comes back 401 (access token expired), we quietly exchange the
+// refresh token for a new access token and REPLAY the original request. The user
+// sees nothing. If the refresh also fails, the session is genuinely over.
+
+let refreshing = null   // a single in-flight refresh, shared by all requests that 401 at once
+
+function endSession() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('user')
+  // Reload so the app re-reads (now empty) auth state. Under HashRouter this lands
+  // a protected route on the login screen; a public route (calendar) just shows
+  // logged-out. Anonymous callers (no refresh token) never reach here.
+  window.location.reload()
+}
+
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
-    // Only force a re-login when a token we HAD got rejected (expired session).
-    // Anonymous callers (no token) are allowed — e.g. viewing the public calendar —
-    // so a 401 on a logged-in-only call just rejects and the caller handles it.
-    if (err.response?.status === 401 && localStorage.getItem('token')) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+  async (err) => {
+    const original = err.config
+    const status = err.response?.status
+    const refreshToken = localStorage.getItem('refresh_token')
+    const isAuthCall = original?.url?.includes('/auth/refresh') || original?.url?.includes('/auth/login')
+
+    // Only try to refresh when: it's a 401, we HAVE a refresh token, we haven't
+    // already retried THIS request, and the failing call isn't the refresh/login itself.
+    if (status === 401 && refreshToken && !original._retried && !isAuthCall) {
+      original._retried = true
+      try {
+        // De-dupe: if several requests 401 together, they all await ONE refresh.
+        refreshing = refreshing || api
+          .post('/auth/refresh', { refresh_token: refreshToken })
+          .then((res) => {
+            localStorage.setItem('token', res.data.access_token)
+            return res.data.access_token
+          })
+          .finally(() => { refreshing = null })
+
+        const newToken = await refreshing
+        original.headers.Authorization = `Bearer ${newToken}`
+        return api(original)                 // replay — the request interceptor re-attaches the new token too
+      } catch (e) {
+        endSession()                         // refresh rejected → truly logged out
+        return Promise.reject(e)
+      }
     }
+
     return Promise.reject(err)
   }
 )

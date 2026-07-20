@@ -13,7 +13,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/rsp_db"
     SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
+    # Access token is SHORT-lived now — if it leaks it's near-worthless. Longevity
+    # ("stay logged in for weeks") is provided by the revocable refresh token below,
+    # which silently mints new access tokens. See app/modules/auth/service.py.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    # Refresh token lifetime. Sliding — each use pushes the expiry forward, so an
+    # actively-used session never has to log in again; an idle one expires here.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Only emails on this domain may be added / may log in (department restriction).
     ALLOWED_EMAIL_DOMAIN: str = "iitk.ac.in"

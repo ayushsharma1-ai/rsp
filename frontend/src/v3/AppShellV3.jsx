@@ -65,7 +65,7 @@ export default function AppShellV3() {
           {sideItem('/notifications', Bell, 'Activity', true, unread > 0)}
           {sideItem('/bookings', BookOpen, 'Bookings')}
           {sideItem('/requests', ArrowLeftRight, 'Requests')}
-          {sideItem('/groups', GraduationCap, 'Groups')}
+          {user?.role === 'admin' && sideItem('/groups', GraduationCap, 'Groups')}
           {user?.role === 'admin' && sideItem('/users', Users, 'Users')}
           {sideItem('/settings', Settings, 'Settings')}
         </nav>

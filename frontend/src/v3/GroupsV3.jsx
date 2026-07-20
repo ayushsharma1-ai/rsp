@@ -1,12 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { Plus, Users, Trash2 } from 'lucide-react'
 import api from '../lib/api'
+import { useAuthStore } from '../store/authStore'
 import { ListSkeleton, Empty, Btn, useSnack } from '../mobile/ui'
 import { haptic } from '../mobile/theme'
 import SheetV3 from './SheetV3'
 
 export function GroupsV3() {
   const snack = useSnack()
+  const { user } = useAuthStore()
+  // Groups are shared reference data (like rooms and event kinds), so only admins
+  // manage them. The API enforces this too — hiding the UI is just courtesy, not
+  // the security boundary.
+  const isAdmin = user?.role === 'admin'
   const [groups, setGroups] = useState(null)
   const [creating, setCreating] = useState(false)
   const [managing, setManaging] = useState(null)
@@ -16,13 +22,21 @@ export function GroupsV3() {
 
   return (
     <div>
-      <Btn variant="primary" full onClick={() => setCreating(true)} style={{ marginBottom: 12 }}><Plus size={18} /> New group</Btn>
+      {isAdmin ? (
+        <Btn variant="primary" full onClick={() => setCreating(true)} style={{ marginBottom: 12 }}><Plus size={18} /> New group</Btn>
+      ) : (
+        <div className="m-muted" style={{ fontSize: '0.82rem', marginBottom: 12 }}>
+          Groups are managed by an admin. You can see them here and tag events with them.
+        </div>
+      )}
 
       {groups === null ? <ListSkeleton h={84} /> :
         groups.length === 0 ? <Empty icon="👥" text="No groups yet. Create one, then add people." /> :
           <div style={{ display: 'grid', gap: 10 }}>
             {groups.map(g => (
-              <button key={g.id} className="m-card m-eventrow" style={{ textAlign: 'left' }} onClick={() => { haptic(); setManaging(g) }}>
+              <button key={g.id} className="m-card m-eventrow"
+                style={{ textAlign: 'left', cursor: isAdmin ? 'pointer' : 'default' }}
+                onClick={() => { if (!isAdmin) return; haptic(); setManaging(g) }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 600 }}>{g.name}</div>
                   {g.description && <div className="m-muted" style={{ fontSize: '0.8rem' }}>{g.description}</div>}

@@ -37,7 +37,7 @@ export function SettingsV3() {
 
       <Row icon={BookOpen} label="Bookings" onClick={() => nav('/bookings')} />
       <Row icon={ArrowLeftRight} label="Slot Requests" onClick={() => nav('/requests')} />
-      <Row icon={GraduationCap} label="Groups & Members" onClick={() => nav('/groups')} />
+      {isAdmin && <Row icon={GraduationCap} label="Groups & Members" onClick={() => nav('/groups')} />}
       {isAdmin && <Row icon={Users} label="Users" onClick={() => nav('/users')} />}
       {isAdmin && <Row icon={DoorOpen} label="Rooms" onClick={() => nav('/rooms')} />}
       {isAdmin && <Row icon={Tag} label="Event kinds" onClick={() => nav('/kinds')} />}
