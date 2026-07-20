@@ -13,17 +13,17 @@
 // Room colours — muted, warm-leaning tones tuned to the graphite & amber theme
 // (distinct from the event-kind colours; readableOn() keeps text legible on each).
 export const VENUES = [
-  { key: '601H-N', label: '601H-N', sub: 'Computer room', color: '#5c6fb0', online: false },
-  { key: '601H-O', label: '601H-O', sub: 'Classroom', color: '#74804b', online: false },
-  { key: '601H-P', label: '601H-P', sub: 'Classroom', color: '#86648f', online: false },
+  { key: '601H-N', label: '601H-N', sub: 'Computer room', color: '#52689e', online: false },
+  { key: '601H-O', label: '601H-O', sub: 'Classroom', color: '#7d8a3d', online: false },
+  { key: '601H-P', label: '601H-P', sub: 'Classroom', color: '#8f5a88', online: false },
   { key: 'online', label: 'Online', sub: 'Add a meeting link', color: '#a0824f', online: true },
 ]
 
 // Cohesive category palette for the graphite & amber theme — muted, mid-tone,
 // readable in both light and dark.
 export const EVENT_COLORS = [
-  '#a8741c', '#b3603c', '#74804b', '#4f8a80',
-  '#3d56c5', '#86648f', '#a0824f', '#8a8276',
+  '#7a52e8', '#b3603c', '#7d8a3d', '#4f8a80',
+  '#8aa11c', '#8f5a88', '#a0824f', '#8a8276',
 ]
 
 export const GROUPS = [
