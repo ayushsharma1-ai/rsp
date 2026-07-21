@@ -31,6 +31,10 @@ const NO_ROOM = '__no_room__'
 // Same idea for cohorts: filter the calendar down to one group's timetable.
 // Sentinel covers events not tagged to any group.
 const NO_GROUP = '__no_group__'
+// Per-group identity colours — a filter whose chips all share one colour can't
+// differentiate anything (that was the bug: every group dot was var(--brand)).
+// Assigned by list position, so colours are stable while the group list is.
+const GROUP_TAG_COLORS = ['#b3603c', '#4f8a80', '#a8741c', '#7d5c8f', '#52689e', '#6f7b45', '#45877f', '#8f5a74']
 
 export function CalendarV3() {
   const { user } = useAuthStore()
@@ -198,12 +202,13 @@ export function CalendarV3() {
           too, so it isn't limited to the month like the room filter. */}
       {view !== 'day' && groupList.length > 0 && (
         <div className="v-filters">
-          {groupList.map(g => {
+          {groupList.map((g, gi) => {
             const on = activeGroups.has(g.id)
+            const gc = GROUP_TAG_COLORS[gi % GROUP_TAG_COLORS.length]
             return (
               <button key={g.id} className={`v-filter ${on ? 'v-filter--on' : ''}`}
-                onClick={() => { haptic(); toggleGroupFilter(g.id) }}>
-                <span className="v-filter__dot" style={{ background: on ? 'var(--brand)' : 'var(--text-3)' }} />{g.name}
+                onClick={() => { haptic(); toggleGroupFilter(g.id) }} style={on ? { borderColor: gc } : {}}>
+                <span className="v-filter__dot" style={{ background: on ? gc : 'var(--text-3)' }} />{g.name}
               </button>
             )
           })}

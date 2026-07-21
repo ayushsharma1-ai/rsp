@@ -81,6 +81,21 @@ export const PALETTES = {
       neutrals: { bg: '#161210', surface: '#1e1814', surface2: '#29211a', border: 'rgba(255,255,255,.11)', text: '#f0e8dc', text2: '#c0b09c', text3: '#8b7b66', barBg: 'rgba(22,18,16,.82)' },
     },
   },
+  oliveRust: {
+    label: 'Olive & rust', dot: '#667033', dot2: '#a94b28',
+    light: { brand: '#667033', press: '#565f2a', gA: '#737d3a', gB: '#667033', pA: '#565f2a', pB: '#464e21', link: '#5c672c', on: '#ffffff', glow: '102,112,51', a2: '#a94b28' },
+    dark:  { brand: '#b9c46e', press: '#a9b45e', gA: '#c6d07d', gB: '#a9b45e', pA: '#a9b45e', pB: '#98a350', link: '#cbd584', on: '#262b0d', glow: '185,196,110', a2: '#e08b66' },
+  },
+  oliveBlush: {
+    label: 'Olive & blush', dot: '#667033', dot2: '#b06a75',
+    light: { brand: '#667033', press: '#565f2a', gA: '#737d3a', gB: '#667033', pA: '#565f2a', pB: '#464e21', link: '#5c672c', on: '#ffffff', glow: '102,112,51', a2: '#b06a75' },
+    dark:  { brand: '#b9c46e', press: '#a9b45e', gA: '#c6d07d', gB: '#a9b45e', pA: '#a9b45e', pB: '#98a350', link: '#cbd584', on: '#262b0d', glow: '185,196,110', a2: '#e8a0ad' },
+  },
+  oliveNavy: {
+    label: 'Olive & navy', dot: '#667033', dot2: '#3b4d8c',
+    light: { brand: '#667033', press: '#565f2a', gA: '#737d3a', gB: '#667033', pA: '#565f2a', pB: '#464e21', link: '#5c672c', on: '#ffffff', glow: '102,112,51', a2: '#3b4d8c' },
+    dark:  { brand: '#b9c46e', press: '#a9b45e', gA: '#c6d07d', gB: '#a9b45e', pA: '#a9b45e', pB: '#98a350', link: '#cbd584', on: '#262b0d', glow: '185,196,110', a2: '#93a5ff' },
+  },
 }
 
 const KEY = 'rsp-palette'
