@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BookOpen, ArrowLeftRight, MessageSquare, LogOut, ChevronRight, GraduationCap, Users, KeyRound, DoorOpen, Tag, Inbox } from 'lucide-react'
+import { PALETTES, applyPalette, currentPalette } from './palettes'
 import { useAuthStore } from '../store/authStore'
 import { haptic } from '../mobile/theme'
 import { Btn, useSnack } from '../mobile/ui'
@@ -23,6 +24,7 @@ export function SettingsV3() {
   const snack = useSnack()
   const isAdmin = user?.role === 'admin'
   const [pwOpen, setPwOpen] = useState(false)
+  const [pal, setPal] = useState(currentPalette())
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -32,6 +34,23 @@ export function SettingsV3() {
           <div style={{ fontWeight: 700 }}>{user?.full_name}</div>
           <div className="m-muted" style={{ fontSize: '0.82rem' }}>{user?.email}</div>
           <span className="m-badge" style={{ marginTop: 6 }}>{user?.role}</span>
+        </div>
+      </div>
+
+      <div className="m-card">
+        <div className="m-label" style={{ marginLeft: 0 }}>Colour</div>
+        <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible', paddingBottom: 0 }}>
+          {Object.entries(PALETTES).map(([k, p]) => (
+            <button key={k} className={`m-chip ${pal === k ? 'm-chip--active' : ''}`}
+              onClick={() => { haptic(); applyPalette(k); setPal(k) }}>
+              <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: p.dot, marginRight: 2, verticalAlign: 'middle', border: '1px solid rgba(0,0,0,.15)' }} />
+              <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: p.dot2 || p.dot, marginRight: 6, marginLeft: -4, verticalAlign: 'middle', border: '1px solid rgba(0,0,0,.15)' }} />
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="m-muted" style={{ fontSize: '0.76rem', marginTop: 8 }}>
+          Applies instantly, remembered on this device. Flip the theme toggle too — every palette has a day and a night take.
         </div>
       </div>
 

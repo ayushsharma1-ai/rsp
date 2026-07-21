@@ -19,6 +19,11 @@ import { KindsV3 } from './v3/KindsV3'
 import { FeedbackInboxV3 } from './v3/FeedbackInboxV3'
 // Feedback is unchanged from v2 (no bottom sheet) — reused as-is.
 import { FeedbackScreen } from './mobile/pages/FeedbackScreen'
+import { initPalettes } from './v3/palettes'
+
+// Apply the saved accent palette before first paint (and keep it in sync with
+// light/dark flips). The neutral base lives in v3.css; palettes swap accents only.
+initPalettes()
 
 function RequireAuth({ children }) {
   const { token } = useAuthStore()

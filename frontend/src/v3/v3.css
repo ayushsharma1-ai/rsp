@@ -279,11 +279,12 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
    block to revert to the original styling.
    ============================================================ */
 :root {
-  /* GRAPE × GRAPHITE — night mode. The warm graphite neutrals stay (identity
-     continuity); the accent is a bright lilac take on the violet (deep violet
-     dies on dark backgrounds). Acid lime is the secondary spark. */
-  --brand: #9d7bff;
-  --brand-press: #8a66f2;
+  /* GALLERY × GRAPHITE — night mode. The warm graphite neutrals stay (identity
+     continuity); the accent becomes a periwinkle take on Klein blue (true IKB
+     dies on dark backgrounds). Amber survives as the warm secondary, carried by
+     event-kind colours and --accent-warm. */
+  --brand: #93a5ff;
+  --brand-press: #7d90f2;
   --bg: #131211;
   --surface: #1b1917;
   --surface-2: #262219;
@@ -292,26 +293,26 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
   --text-2: #b4ab9a;
   --text-3: #83796a;
   --bar-bg: rgba(19,18,17,.82);
-  --link: #b9a1ff;
-  --accent-2: #c6e94a;
-  --on-accent: #1d1040;       /* deep violet-ink text on the light lilac accent */
-  --grad-brand: linear-gradient(135deg, #ab8dff 0%, #8a66f2 100%);
-  --grad-brand-press: linear-gradient(135deg, #8a66f2 0%, #7554e0 100%);
+  --link: #b3c0ff;
+  --accent-warm: #e0a64a;
+  --on-accent: #10143c;       /* deep navy text on the light periwinkle accent */
+  --grad-brand: linear-gradient(135deg, #a3b2ff 0%, #7d90f2 100%);
+  --grad-brand-press: linear-gradient(135deg, #7d90f2 0%, #6a7de6 100%);
   --ease: cubic-bezier(.2,.8,.2,1);
   --elev-1: 0 1px 2px rgba(0,0,0,.5);
   --elev-2: 0 8px 26px rgba(0,0,0,.45);
   --elev-3: 0 24px 64px rgba(0,0,0,.6);
-  --glow-brand: 0 5px 18px rgba(157,123,255,.22);
+  --glow-brand: 0 5px 18px rgba(147,165,255,.22);
   --hairline: inset 0 1px 0 rgba(255,255,255,.06);
-  --ring-focus: 0 0 0 3px rgba(157,123,255,.30);
+  --ring-focus: 0 0 0 3px rgba(147,165,255,.30);
   --surface-hi: rgba(255,255,255,.04);
 }
 [data-theme="light"] {
-  /* GRAPE day mode — the warm cream paper and warm ink stay (user's call:
-     grape accent, gallery paper), with electric violet as the single
-     high-saturation accent and acid lime as the quiet secondary. */
-  --brand: #5b2ee5;
-  --brand-press: #4a23c0;
+  /* GALLERY day mode — warm paper, warm ink, and International Klein Blue as
+     the single high-saturation accent (the documented pairing: IKB + creamy
+     white + charcoal). Ochre is the warm secondary. */
+  --brand: #002fa7;
+  --brand-press: #00257f;
   --bg: #f7f4ec;
   --surface: #fffdf7;
   --surface-2: #efe9dc;
@@ -320,17 +321,17 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
   --text-2: #6d665a;
   --text-3: #9d947f;
   --bar-bg: rgba(250,247,240,.86);
-  --link: #4f2bd0;
-  --accent-2: #6b8600;
-  --on-accent: #ffffff;       /* white text on electric violet */
-  --grad-brand: linear-gradient(135deg, #6a3df2 0%, #5b2ee5 100%);
-  --grad-brand-press: linear-gradient(135deg, #4a23c0 0%, #3b1a9e 100%);
+  --link: #1f3fd0;
+  --accent-warm: #a8741c;
+  --on-accent: #ffffff;       /* white text on Klein blue */
+  --grad-brand: linear-gradient(135deg, #0d3cbe 0%, #002fa7 100%);
+  --grad-brand-press: linear-gradient(135deg, #00257f 0%, #001c62 100%);
   --elev-1: 0 1px 2px rgba(42,35,20,.10);
   --elev-2: 0 10px 26px rgba(42,35,20,.10);
   --elev-3: 0 24px 64px rgba(42,35,20,.16);
-  --glow-brand: 0 8px 20px rgba(91,46,229,.18);
+  --glow-brand: 0 8px 20px rgba(0,47,167,.18);
   --hairline: inset 0 1px 0 rgba(255,255,255,.85);
-  --ring-focus: 0 0 0 3px rgba(91,46,229,.18);
+  --ring-focus: 0 0 0 3px rgba(0,47,167,.18);
   --surface-hi: rgba(255,255,255,.7);
 }
 
@@ -444,3 +445,15 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-topbar__title { font-size: 1.45rem; }
 .v-sidebar__logo { font-family: 'Fraunces', Georgia, serif; font-weight: 600; }
 .m-sheet__title { font-size: 1.3rem; }
+
+/* ============================================================
+   DUO LAYER — every palette is a designed PAIR with a role split:
+   the brand colour marks ACTION (buttons, links, FAB), the second
+   colour marks TIME (today's date, the now line). Falls back to
+   brand if a palette defines no secondary.
+   ============================================================ */
+.v-daycell--today .v-daynum,
+.v-dayhead__num--today,
+.v-week__dayhd--today .v-week__num { color: var(--accent-2, var(--brand)); }
+.v-daycell--today { border-color: color-mix(in srgb, var(--accent-2, var(--brand)) 50%, var(--border)); }
+.v-nowline, .v-nowline::before { background: var(--accent-2, var(--brand)); }
