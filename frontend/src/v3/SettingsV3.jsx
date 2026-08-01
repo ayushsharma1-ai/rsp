@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, ArrowLeftRight, MessageSquare, LogOut, ChevronRight, GraduationCap, Users, KeyRound, DoorOpen, Tag, Inbox } from 'lucide-react'
-import { PALETTES, applyPalette, currentPalette } from './palettes'
+import { BookOpen, ArrowLeftRight, MessageSquare, LogOut, ChevronRight, GraduationCap, Users, KeyRound, DoorOpen, Tag, Inbox, Moon, Sun } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
-import { haptic } from '../mobile/theme'
+import { haptic, useTheme } from '../mobile/theme'
 import { Btn, useSnack } from '../mobile/ui'
 import api from '../lib/api'
 import SheetV3 from './SheetV3'
+import { errText } from '../mobile/lib'
 
 function Row({ icon: Icon, label, onClick, danger }) {
   return (
@@ -24,39 +24,25 @@ export function SettingsV3() {
   const snack = useSnack()
   const isAdmin = user?.role === 'admin'
   const [pwOpen, setPwOpen] = useState(false)
-  const [pal, setPal] = useState(currentPalette())
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
       <div className="m-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div className="m-avatar">{(user?.full_name || '?')[0]?.toUpperCase()}</div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700 }}>{user?.full_name}</div>
-          <div className="m-muted" style={{ fontSize: '0.82rem' }}>{user?.email}</div>
+          <div className="m-muted" style={{ fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{user?.email}</div>
           <span className="m-badge" style={{ marginTop: 6 }}>{user?.role}</span>
         </div>
       </div>
 
-      <div className="m-card">
-        <div className="m-label" style={{ marginLeft: 0 }}>Colour</div>
-        <div className="m-chips" style={{ flexWrap: 'wrap', overflow: 'visible', paddingBottom: 0 }}>
-          {Object.entries(PALETTES).map(([k, p]) => (
-            <button key={k} className={`m-chip ${pal === k ? 'm-chip--active' : ''}`}
-              onClick={() => { haptic(); applyPalette(k); setPal(k) }}>
-              <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: p.dot, marginRight: 2, verticalAlign: 'middle', border: '1px solid rgba(0,0,0,.15)' }} />
-              <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: p.dot2 || p.dot, marginRight: 6, marginLeft: -4, verticalAlign: 'middle', border: '1px solid rgba(0,0,0,.15)' }} />
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="m-muted" style={{ fontSize: '0.76rem', marginTop: 8 }}>
-          Applies instantly, remembered on this device. Flip the theme toggle too — every palette has a day and a night take.
-        </div>
-      </div>
+      {/* theme lives HERE now, not in the top bar — the calendar page carries
+          navigation and content only */}
+      <ThemeRow />
 
       <Row icon={BookOpen} label="Bookings" onClick={() => nav('/bookings')} />
-      <Row icon={ArrowLeftRight} label="Slot Requests" onClick={() => nav('/requests')} />
-      {isAdmin && <Row icon={GraduationCap} label="Groups & Members" onClick={() => nav('/groups')} />}
+      <Row icon={ArrowLeftRight} label="Slot requests" onClick={() => nav('/requests')} />
+      {isAdmin && <Row icon={GraduationCap} label="Groups" onClick={() => nav('/groups')} />}
       {isAdmin && <Row icon={Users} label="Users" onClick={() => nav('/users')} />}
       {isAdmin && <Row icon={DoorOpen} label="Rooms" onClick={() => nav('/rooms')} />}
       {isAdmin && <Row icon={Tag} label="Event kinds" onClick={() => nav('/kinds')} />}
@@ -67,6 +53,22 @@ export function SettingsV3() {
 
       <ChangePasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} snack={snack} />
     </div>
+  )
+}
+
+// Dark/light toggle as a settings row — shows the CURRENT state and flips on tap.
+function ThemeRow() {
+  const [theme, toggle] = useTheme()
+  const dark = theme === 'dark'
+  return (
+    <button className="m-card m-listbtn m-listbtn--switch" onClick={() => { haptic(); toggle() }}
+      role="switch" aria-checked={dark} aria-label="Dark mode">
+      {dark ? <Moon size={20} /> : <Sun size={20} />}
+      <span>Dark mode</span>
+      <span className={`v-switch ${dark ? 'v-switch--on' : ''}`} style={{ marginLeft: 'auto' }} aria-hidden="true">
+        <span className="v-switch__knob" />
+      </span>
+    </button>
   )
 }
 
@@ -85,21 +87,21 @@ function ChangePasswordSheet({ open, onClose, snack }) {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (next.length < 8) { setError('New password must be at least 8 characters.'); return }
-    if (next !== confirm) { setError('The two new passwords don’t match.'); return }
+    if (next.length < 8) { setError('Min 8 characters.'); return }
+    if (next !== confirm) { setError('Passwords don’t match.'); return }
     setLoading(true); setError('')
     try {
       await api.post('/users/me/password', { current_password: cur, new_password: next })
       snack('Password changed')
       onClose()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not change password.')
+      setError(errText(err, 'Couldn’t save. Retry.'))
     } finally { setLoading(false) }
   }
 
   return (
     <SheetV3 open={open} onClose={onClose} title="Change password">
-      <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
+      <form onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
         <div>
           <label className="m-label">Current password</label>
           <input className="m-input" type="password" value={cur} onChange={e => setCur(e.target.value)}
@@ -117,7 +119,7 @@ function ChangePasswordSheet({ open, onClose, snack }) {
         </div>
         <div className="m-muted" style={{ fontSize: '0.78rem' }}>At least 8 characters.</div>
         {error && <p className="m-error">{error}</p>}
-        <Btn type="submit" variant="primary" full loading={loading}>Change password</Btn>
+        <Btn type="submit" variant="primary" full loading={loading}>Save</Btn>
       </form>
     </SheetV3>
   )

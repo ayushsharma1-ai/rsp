@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import DataError
 
 from app.core.database import Base, engine
 from app.core.config import settings
@@ -50,6 +51,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(DataError)
+async def data_error_handler(request: Request, exc: DataError):
+    # A malformed path/query value — most often a non-UUID id like /events/abc — makes
+    # Postgres raise DataError ("invalid input syntax for type uuid"). That's a bad
+    # reference to a thing that can't exist, not a server fault, so answer 404 instead
+    # of a scary 500. Starlette routes to this handler over the generic one below
+    # because it's the more specific exception type.
+    logger.info(f"DataError on {request.method} {request.url}: {getattr(exc, 'orig', exc)}")
+    return JSONResponse(status_code=404, content={"detail": "Not found."})
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

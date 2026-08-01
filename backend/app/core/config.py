@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # Only emails on this domain may be added / may log in (department restriction).
     ALLOWED_EMAIL_DOMAIN: str = "iitk.ac.in"
 
+    # Wall-clock zone for user-facing dates in notifications and conflict messages.
+    # Pinned (not the server's ambient TZ) so those strings stay correct even if the
+    # host is set to UTC or moved. IANA name; override via env for another deployment.
+    APP_TIMEZONE: str = "Asia/Kolkata"
+
     # Comma-separated list of allowed browser origins. "*" is fine for local dev;
     # in production this MUST be your real frontend origin(s).
     CORS_ORIGINS: str = "*"

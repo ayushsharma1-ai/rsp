@@ -33,7 +33,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">
-          <span className="auth-logo__mark">RSP</span>
+          <span className="auth-logo__mark">📅</span>
           <p className="auth-logo__sub">Resource Scheduling Platform</p>
         </div>
 

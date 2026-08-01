@@ -99,7 +99,30 @@ class UserService:
 
     def update_user(self, user_id: str, data: UserUpdate, actor: User) -> User:
         u = self.get_user(user_id)
-        for field, value in data.model_dump(exclude_none=True).items():
+        changes = data.model_dump(exclude_none=True)
+
+        # Guard: never leave the platform with zero active admins. Demoting the last
+        # admin (role away from ADMIN) or deactivating them would lock EVERYONE out of
+        # admin functions with no way back in. Refuse unless another active admin exists.
+        if u.role == UserRole.ADMIN:
+            losing_admin = (
+                (changes.get("role") is not None and changes["role"] != UserRole.ADMIN)
+                or (changes.get("is_active") is False)
+            )
+            if losing_admin:
+                other_admins = self.db.query(User).filter(
+                    User.role == UserRole.ADMIN,
+                    User.is_active == True,  # noqa: E712
+                    User.id != u.id,
+                ).count()
+                if other_admins == 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="This is the only active admin. Promote another admin "
+                               "before changing this account's role or status.",
+                    )
+
+        for field, value in changes.items():
             setattr(u, field, value)
         self.db.commit()
         self.db.refresh(u)
@@ -110,6 +133,18 @@ class UserService:
             raise HTTPException(status_code=400,
                                 detail=f"Password must be at least {MIN_PASSWORD_LEN} characters")
         user.hashed_password = get_password_hash(new_password)
+        # Revoke every refresh token this user holds. Changing a password is the one
+        # move someone makes when they think a session is compromised — but the access
+        # JWT is stateless and the refresh token is what actually keeps a thief alive:
+        # it mints a new access token indefinitely and slides its own 30-day expiry
+        # forward each time. Without this the reset accomplished nothing and the only
+        # remedy was deactivating the account. The user's other devices are signed out
+        # too, which is exactly what "I changed my password" should mean.
+        from app.modules.models import RefreshToken
+        self.db.query(RefreshToken).filter(
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked == False,  # noqa: E712
+        ).update({"revoked": True}, synchronize_session=False)
         self.db.commit()
 
     def change_own_password(self, user: User, data: 'PasswordChange') -> None:

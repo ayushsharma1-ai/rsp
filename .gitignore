@@ -16,3 +16,13 @@ dist/
 
 # Personal study notes — kept local, not pushed
 learning/
+
+# Production data snapshots — contain real names, emails and password hashes.
+# Never commit: git history is permanent and these are real people's details.
+rsp_data_dump.sql
+backend/rsp_data_dump.sql
+*.dump.sql
+
+# Throwaway debug/scratch scripts and their output
+backend/cancacc_tmp.py
+backend/owncanc_ids*.json

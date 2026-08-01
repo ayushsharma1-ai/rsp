@@ -27,7 +27,7 @@ export default function LoginScreen() {
   return (
     <div className="m-login">
       <div className="m-login__brand">
-        <div className="m-login__mark">RSP</div>
+        <div className="m-login__mark">📅</div>
         <h1 className="m-h">Scheduler</h1>
         <p className="m-muted">Book rooms, labs and events.</p>
       </div>

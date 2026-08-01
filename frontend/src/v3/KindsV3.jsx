@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import api from '../lib/api'
 import { ListSkeleton, Empty, Btn, useSnack } from '../mobile/ui'
 import { haptic } from '../mobile/theme'
 import SheetV3 from './SheetV3'
+import { useConfirm } from './ConfirmSheet'
 import { EVENT_COLORS, readableOn } from './config'
+import { errText } from '../mobile/lib'
 
 // Event kinds are the categories shown when creating an event (Class, Workshop,
 // Talk...). The kind's colour is what the calendar paints the event with.
@@ -26,13 +28,13 @@ export function KindsV3() {
       </Btn>
 
       <div className="m-muted" style={{ fontSize: '0.78rem', margin: '0 2px 10px' }}>
-        These are the categories people pick when creating an event. The colour here is
-        the colour the event shows on the calendar.
+        Kinds are what people pick when creating an event. This colour is how it shows
+        on the calendar.
       </div>
 
       {kinds === null ? <ListSkeleton h={64} /> :
         kinds.length === 0 ? <Empty icon="🏷️" text="No event kinds yet." /> :
-          <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10 }}>
             {kinds.map(k => (
               <button key={k.id} className="m-card m-eventrow" style={{ textAlign: 'left' }}
                 onClick={() => { haptic(); setEditing(k) }}>
@@ -65,6 +67,7 @@ function KindSheet({ open, kind, onClose, onDone, snack }) {
   const [color, setColor] = useState(EVENT_COLORS[0])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [confirm, confirmEl] = useConfirm()
 
   useEffect(() => {
     if (open) {
@@ -74,22 +77,36 @@ function KindSheet({ open, kind, onClose, onDone, snack }) {
     }
   }, [open, kind])
 
+  const del = async () => {
+    if (!kind || loading) return
+    const ok = await confirm({
+      title: `Delete “${kind.name}”?`,
+      body: `Blocked if any event still uses it.`,
+      confirmLabel: 'Delete kind', cancelLabel: 'Keep', danger: true,
+    })
+    if (!ok) return
+    setLoading(true); setError('')
+    try { await api.delete(`/event-kinds/${kind.id}`); snack('Kind deleted'); onDone() }
+    catch (err) { setError(errText(err, 'Could not delete this kind.')) }
+    finally { setLoading(false) }
+  }
+
   const submit = async (e) => {
     e.preventDefault()
     if (!name.trim()) { setError('Give the kind a name.'); return }
-    if (!/^#[0-9a-fA-F]{6}$/.test(color)) { setError('Colour must be a hex value like #d99a4e.'); return }
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) { setError('Use a hex colour, e.g. #d99a4e.'); return }
     setLoading(true); setError('')
     try {
       if (kind) await api.patch(`/event-kinds/${kind.id}`, { name: name.trim(), color })
       else await api.post('/event-kinds', { name: name.trim(), color })
       snack(kind ? 'Kind updated' : 'Kind added'); onDone()
-    } catch (err) { setError(err.response?.data?.detail || 'Could not save.') }
+    } catch (err) { setError(errText(err, 'Could not save.')) }
     finally { setLoading(false) }
   }
 
   return (
     <SheetV3 open={open} onClose={onClose} title={kind ? `Edit: ${kind.name}` : 'Add event kind'}>
-      <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
+      <form onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
         <div><label className="m-label">Name</label>
           <input className="m-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Seminar" /></div>
 
@@ -100,7 +117,7 @@ function KindSheet({ open, kind, onClose, onDone, snack }) {
               <button key={c} type="button" onClick={() => { haptic(); setColor(c) }}
                 aria-label={c}
                 style={{
-                  width: 34, height: 34, borderRadius: 10, background: c, cursor: 'pointer',
+                  width: 44, height: 44, borderRadius: 10, background: c, cursor: 'pointer',
                   border: color.toLowerCase() === c.toLowerCase() ? '3px solid var(--text)' : '1px solid var(--border)',
                 }} />
             ))}
@@ -117,7 +134,16 @@ function KindSheet({ open, kind, onClose, onDone, snack }) {
 
         {error && <p className="m-error">{error}</p>}
         <Btn type="submit" variant="primary" full loading={loading}>{kind ? 'Save changes' : 'Add kind'}</Btn>
+        {kind && (
+          <div style={{ marginTop: 6, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <button type="button" className="m-link" style={{ color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+              disabled={loading} onClick={del}>
+              <Trash2 size={15} /> Delete this kind
+            </button>
+          </div>
+        )}
       </form>
+      {confirmEl}
     </SheetV3>
   )
 }

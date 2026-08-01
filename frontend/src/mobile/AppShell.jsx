@@ -21,7 +21,7 @@ export default function AppShell() {
   const loc = useLocation()
   const navigate = useNavigate()
   const isTab = TAB_PATHS.includes(loc.pathname)
-  const title = TITLES[loc.pathname] || 'RSP'
+  const title = TITLES[loc.pathname] || 'Scheduler'
 
   return (
     <div className="m-app">

@@ -37,7 +37,8 @@ def accept(request_id: str, data: Optional[ReleaseAccept] = None,
            db: Session = Depends(get_db), current_user: User = Depends(require_editor)):
     data = data or ReleaseAccept()
     return ReleaseService(db).accept(request_id, current_user,
-                                     mode=data.mode, new_start=data.new_start, new_end=data.new_end)
+                                     mode=data.mode, new_start=data.new_start, new_end=data.new_end,
+                                     scope=data.scope)
 
 
 @router.post("/{request_id}/decline", response_model=ReleaseRequestOut)

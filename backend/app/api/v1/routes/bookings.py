@@ -40,13 +40,22 @@ class UpdateEventRequest(PydanticBase):
     end_time:         Optional[datetime] = None
     title:            Optional[str]      = None
     description:      Optional[str]      = None
-    occurrence_date:  Optional[datetime] = None   # if set → edit one occurrence only
+    event_kind_id:    Optional[str]      = None   # change the event's type/colour
+    occurrence_date:  Optional[datetime] = None   # which occurrence (for occurrence/following scope)
+    scope:            Optional[str]      = None   # recurring: 'occurrence' | 'following' | 'series'
+    # Whole-event properties. These are forwarded ONLY when the client actually
+    # sent them, because an explicit null on resource_id means "remove the room"
+    # (venue not decided yet) — see EventUpdate in the service.
+    resource_id:      Optional[str]       = None
+    group_ids:        Optional[List[str]] = None
+    is_public:        Optional[bool]      = None
+    organizer_id:     Optional[str]       = None   # admin only — reassign the owner
 
 class CancelEventRequest(PydanticBase):
-    # Optional — only provided when cancelling one occurrence
-    # of a recurring series
-    # If None → cancel the entire event or series
+    # For a recurring event, occurrence_date identifies which occurrence and
+    # scope says how much to cancel ('occurrence' | 'following' | 'series').
     occurrence_date: Optional[datetime] = None
+    scope:           Optional[str]      = None
 
 @events_router.post("/{event_id}/cancel-occurrence")
 def cancel_occurrence(
@@ -159,17 +168,27 @@ def update_event(
     current_user: User = Depends(require_editor),
 ):
     from app.modules.bookings.service import EventUpdate
-    event_data = EventUpdate(
+    payload = dict(
         start_time=data.start_time,
         end_time=data.end_time,
         title=data.title,
         description=data.description,
+        event_kind_id=data.event_kind_id,
     )
+    # Forward room / groups / visibility ONLY if the client actually sent them.
+    # Passing them unconditionally would make every edit look like "set the room to
+    # null", i.e. silently strip the room off any event the user merely renamed.
+    sent = getattr(data, 'model_fields_set', None) or getattr(data, '__fields_set__', set())
+    for f in ('resource_id', 'group_ids', 'is_public', 'organizer_id'):
+        if f in sent:
+            payload[f] = getattr(data, f)
+    event_data = EventUpdate(**payload)
     return BookingService(db).update_event(
         event_id=event_id,
         data=event_data,
         actor=current_user,
         occurrence_date=data.occurrence_date,
+        scope=data.scope,
     )
 
 
@@ -184,6 +203,7 @@ def cancel_event(
         event_id=event_id,
         actor=current_user,
         occurrence_date=data.occurrence_date,
+        scope=data.scope,
     )
 
 

@@ -32,10 +32,41 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.recurrence import expand_rrule
-from app.modules.models import Booking, Resource, BookingStatus, ResourceType
+from app.modules.models import Booking, Resource, BookingStatus, ResourceType, Event, EventStatus
+
+
+def _to_utc_naive(dt: datetime) -> datetime:
+    """Normalise to naive-UTC so two datetimes are compared by absolute INSTANT,
+    never by their string offset (recurring occurrences come back +00:00 but edited
+    exception rows come back in server-local +05:30 — same instant, different text)."""
+    if dt.tzinfo is not None:
+        off = dt.utcoffset()
+        if off:
+            dt = dt - off
+        return dt.replace(tzinfo=None)
+    return dt
+
+
+def _fmt_local(dt: datetime, fmt: str) -> str:
+    """Render in the app's pinned wall-clock zone for user-facing conflict messages.
+    RRULE occurrences are UTC-aware; showing them raw reads 5h30 off from the calendar.
+    Convert aware datetimes to APP_TIMEZONE (pinned, not the server's ambient zone) so
+    the message matches what the user sees. Naive values are assumed already-local."""
+    try:
+        if getattr(dt, "tzinfo", None) is not None:
+            try:
+                from zoneinfo import ZoneInfo
+                from app.core.config import settings
+                return dt.astimezone(ZoneInfo(settings.APP_TIMEZONE)).strftime(fmt)
+            except Exception:
+                return dt.astimezone().strftime(fmt)
+        return dt.strftime(fmt)
+    except Exception:
+        return dt.strftime(fmt)
 
 
 # A booking in any of these states is a real claim on the room, so it counts as "busy".
@@ -90,6 +121,64 @@ class AvailabilityService:
         row = self.db.query(Resource.name).filter(Resource.id == resource_id).first()
         return row[0] if row else resource_id
 
+    def _effective_occurrences(self, template: Booking, search_start: datetime, search_end: datetime):
+        """The template's REAL busy windows in [start, end), with per-occurrence
+        exceptions applied — so availability agrees with the calendar.
+
+        A recurring template stores one RRULE; each generated occurrence can be
+        overridden by an exception Event (parent_event_id = the root, keyed by
+        occurrence_date). CANCELLED exception → that date is VACATED (free again).
+        CONFIRMED exception → the occurrence happens at the exception's OWN time
+        (which may be moved). Without this, a cancelled class still marked its room
+        busy forever, so the freed slot became un-bookable by anyone."""
+        duration = template.end_time - template.start_time
+        occ = expand_rrule(
+            rrule_string=template.recurrence_rule.rrule,
+            dtstart=template.start_time,
+            duration=duration,
+            search_start=search_start,
+            search_end=search_end,
+        )
+        root_id = template.event_id
+        exceptions = self.db.query(Event).filter(Event.parent_event_id == root_id).all() if root_id else []
+        if not exceptions:
+            return occ
+
+        overridden = {_to_utc_naive(ex.occurrence_date) for ex in exceptions if ex.occurrence_date is not None}
+
+        # WHICH ROOM does each exception actually occupy?
+        #   • its own ACTIVE booking      → that room (moved to a different room)
+        #   • only a CANCELLED booking    → no room at all ("venue not decided")
+        #   • no booking row whatsoever   → inherits THIS template's room
+        # Without this, an occurrence moved to another room left the ORIGINAL room
+        # falsely busy — the reason per-occurrence room changes were blocked before.
+        # An occurrence that owns a booking is accounted for BY that booking (CHECK 1
+        # scans raw non-template bookings), so this template must not also count it —
+        # otherwise the same occurrence is busy twice and every later edit of it
+        # self-conflicts. Occurrences with no row of their own still inherit here.
+        owns_booking = set()
+        ex_ids = [ex.id for ex in exceptions]
+        if ex_ids:
+            for bk in self.db.query(Booking).filter(
+                Booking.event_id.in_(ex_ids),
+                Booking.is_recurring_template == False,  # noqa: E712
+            ).all():
+                owns_booking.add(bk.event_id)
+
+        def _occupies_this_room(ex):
+            return ex.id not in owns_booking
+
+        result = [
+            (ex.start_time, ex.end_time)
+            for ex in exceptions
+            if ex.status != EventStatus.CANCELLED and ex.occurrence_date is not None
+            and _occupies_this_room(ex)
+            and ex.start_time < search_end and ex.end_time > search_start
+        ]
+        # keep the RRULE occurrences that no exception has overridden
+        result.extend((s, e) for (s, e) in occ if _to_utc_naive(s) not in overridden)
+        return result
+
     # ---- THE SHARED CORE: first clash in a window, or None ------------------
     def find_conflict(
         self,
@@ -106,7 +195,22 @@ class AvailabilityService:
         `lock=True` adds `SELECT ... FOR UPDATE`, locking the matching rows until the
         surrounding transaction finishes. That is what makes booking creation race-safe.
         Read-only callers keep `lock=False` (no lock → faster, never blocks anyone).
+
+        RACE NOTE: `SELECT ... FOR UPDATE` only locks rows that ALREADY EXIST. When two
+        people book the SAME empty slot at the same instant, there are no rows to lock,
+        so both pass the check and both inserts succeed — a double-booking. To close that
+        gap we take a Postgres *advisory* lock keyed on the resource id before checking.
+        Advisory locks don't need a row to exist; concurrent writers on the same resource
+        serialise, so the second one sees the first one's committed booking and gets 409.
+        The lock is transaction-scoped (`_xact_`) — released automatically on commit/rollback.
         """
+        if lock:
+            # One writer per resource at a time. hashtext()→int4, widened to bigint for
+            # the single-arg advisory-lock overload. Different resources never block.
+            self.db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:rid)::bigint)"),
+                {"rid": str(resource_id)},
+            )
         # CHECK 1 — overlap with an existing one-off booking.
         q = self.db.query(Booking).filter(
             Booking.resource_id == resource_id,
@@ -148,15 +252,13 @@ class AvailabilityService:
         for t in templates:
             if not t.recurrence_rule:
                 continue
-            duration = t.end_time - t.start_time
-            occurrences = expand_rrule(
-                rrule_string=t.recurrence_rule.rrule,
-                dtstart=t.start_time,
-                duration=duration,
-                search_start=start,
-                search_end=end,
-            )
+            # exception-aware: a cancelled/moved occurrence no longer blocks its slot
+            occurrences = [
+                (s, e) for (s, e) in self._effective_occurrences(t, start, end)
+                if s < end and e > start
+            ]
             if occurrences:
+                occurrences.sort(key=lambda iv: iv[0])
                 occ_start, occ_end = occurrences[0]
                 name = self._resource_name(resource_id)
                 title = t.event.title if t.event else "Recurring event"
@@ -167,8 +269,8 @@ class AvailabilityService:
                     message=(
                         f"Resource '{name}' has a recurring booking "
                         f"('{title}') that conflicts on "
-                        f"{occ_start.strftime('%a, %b %d at %H:%M')}–"
-                        f"{occ_end.strftime('%H:%M')}"
+                        f"{_fmt_local(occ_start, '%a, %b %d at %H:%M')}–"
+                        f"{_fmt_local(occ_end, '%H:%M')}"
                     ),
                 )
 
@@ -206,14 +308,11 @@ class AvailabilityService:
         for t in templates:
             if not t.recurrence_rule:
                 continue
-            duration = t.end_time - t.start_time
-            intervals.extend(expand_rrule(
-                rrule_string=t.recurrence_rule.rrule,
-                dtstart=t.start_time,
-                duration=duration,
-                search_start=range_start,
-                search_end=range_end,
-            ))
+            # exception-aware: cancelled occurrences drop out, moved ones shift
+            intervals.extend(
+                (s, e) for (s, e) in self._effective_occurrences(t, range_start, range_end)
+                if s < range_end and e > range_start
+            )
 
         intervals.sort(key=lambda iv: iv[0])
         return intervals

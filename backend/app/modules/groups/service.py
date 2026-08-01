@@ -72,7 +72,10 @@ class GroupService:
         return out
 
     def create_group(self, data: GroupCreate) -> GroupOut:
-        g = Group(name=data.name, description=data.description, group_type=data.group_type)
+        name = (data.name or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Group name is required")
+        g = Group(name=name, description=data.description, group_type=data.group_type)
         self.db.add(g)
         self.db.commit()
         self.db.refresh(g)
@@ -135,7 +138,10 @@ class GroupService:
         return [RosterPersonOut(id=p.id, full_name=p.full_name, email=p.email) for p in people]
 
     def create_roster_person(self, data: RosterPersonCreate) -> RosterPersonOut:
-        p = RosterPerson(full_name=data.full_name, email=data.email)
+        full_name = (data.full_name or "").strip()
+        if not full_name:
+            raise HTTPException(status_code=400, detail="Person's name is required")
+        p = RosterPerson(full_name=full_name, email=(data.email or None))
         self.db.add(p)
         self.db.commit()
         self.db.refresh(p)

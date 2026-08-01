@@ -38,6 +38,20 @@ ACTIVE_BOOKING_STATUSES = [
 ]
 
 
+def _to_utc_naive(dt):
+    """Normalise to naive-UTC so datetimes compare by absolute INSTANT, never by the
+    string offset they carry (RRULE occurrences come back +00:00, DB exception rows in
+    server-local +05:30 — same moment, different text)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        off = dt.utcoffset()
+        if off:
+            dt = dt - off
+        return dt.replace(tzinfo=None)
+    return dt
+
+
 class VenueBooking(BaseModel):
     """Who currently holds a contested room (meeting C: 'see who holds a booked slot')."""
     booking_id: str
@@ -89,6 +103,57 @@ class ClashService:
             .all()
         )
         return {r[0] for r in rows}
+
+    def _effective_occurrences_for_root(self, root, search_start, search_end):
+        """Exception-aware occurrences of a recurring ROOT event in [start, end).
+
+        Mirrors AvailabilityService._effective_occurrences so clash detection agrees
+        with the calendar. A recurring root stores one RRULE; any occurrence can be
+        overridden by an exception Event (parent_event_id = root, keyed by
+        occurrence_date):
+          • CANCELLED exception  → that date is VACATED (the slot is free).
+          • CONFIRMED exception  → the occurrence happens at the exception's OWN time
+                                    (which may have MOVED to a different hour/day).
+        Without this, a class that was moved (or cancelled) still reported its ORIGINAL
+        RRULE slot as busy — so "request this slot" showed a phantom holder on a slot
+        that is actually free (and the calendar, which IS exception-aware, disagreed)."""
+        duration = root.end_time - root.start_time
+        occ = expand_rrule(
+            root.recurrence_rule.rrule, root.start_time, duration, search_start, search_end,
+        )
+        exceptions = self.db.query(Event).filter(Event.parent_event_id == root.id).all()
+        if not exceptions:
+            return occ
+        overridden = {_to_utc_naive(ex.occurrence_date) for ex in exceptions if ex.occurrence_date is not None}
+
+        # Mirror AvailabilityService._effective_occurrences: an occurrence moved to a
+        # DIFFERENT room no longer occupies this series' room, so it must not be
+        # reported as a clash there (it is reported against its own room instead,
+        # because the exception carries its own Booking and Pass 1 picks that up).
+        # An occurrence that owns a booking is reported against ITS OWN room by Pass 1
+        # (exception rows are plain non-root events), so this series must not report
+        # it too — that would both double-report and wrongly blame the series' room.
+        owns_booking = set()
+        ex_ids = [ex.id for ex in exceptions]
+        if ex_ids:
+            for bk in self.db.query(Booking).filter(
+                Booking.event_id.in_(ex_ids),
+                Booking.is_recurring_template == False,  # noqa: E712
+            ).all():
+                owns_booking.add(bk.event_id)
+
+        # moved/edited occurrences count at their NEW time (if it overlaps the window)
+        result = [
+            (ex.start_time, ex.end_time)
+            for ex in exceptions
+            if ex.status != EventStatus.CANCELLED and ex.occurrence_date is not None
+            and ex.id not in owns_booking
+            and _to_utc_naive(ex.start_time) < _to_utc_naive(search_end)
+            and _to_utc_naive(ex.end_time) > _to_utc_naive(search_start)
+        ]
+        # keep RRULE occurrences no exception has overridden (cancelled ones just drop out)
+        result.extend((s, e) for (s, e) in occ if _to_utc_naive(s) not in overridden)
+        return result
 
     # -- the core -------------------------------------------------------------
     def _make_clash(self, ev, shared_res, shared_ppl, when_start, when_end) -> ClashInfo:
@@ -162,13 +227,18 @@ class ClashService:
         for ev in rec_q.all():
             if not ev.recurrence_rule:
                 continue
-            occ = expand_rrule(ev.recurrence_rule.rrule, ev.start_time,
-                               ev.end_time - ev.start_time, start, end)
+            # Exception-aware: a cancelled occurrence frees its slot, a moved one counts
+            # at its NEW time. Then keep only those that actually overlap the window.
+            occ = [
+                (s, e) for (s, e) in self._effective_occurrences_for_root(ev, start, end)
+                if _to_utc_naive(s) < _to_utc_naive(end) and _to_utc_naive(e) > _to_utc_naive(start)
+            ]
             if not occ:
-                continue   # no occurrence of this series lands in the window
+                continue   # no (effective) occurrence of this series lands in the window
             shared_res = my_resources & self._resource_ids_for_event(ev.id)
             shared_ppl = my_people & self._people_for_groups(self._group_ids_for_event(ev.id))
             if shared_res or shared_ppl:
+                occ.sort(key=lambda iv: _to_utc_naive(iv[0]))
                 occ_s, occ_e = occ[0]
                 clashes.append(self._make_clash(ev, shared_res, shared_ppl, occ_s, occ_e))
 

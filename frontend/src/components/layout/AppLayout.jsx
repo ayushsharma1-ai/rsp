@@ -39,7 +39,7 @@ export default function AppLayout() {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar__logo">
-          <span className="sidebar__logo-mark">RSP</span>
+          <span className="sidebar__logo-mark"><CalendarDays size={18} /></span>
           <span className="sidebar__logo-text">Scheduler</span>
           <button className="sidebar__close-btn" onClick={() => setSidebarOpen(false)}>
             <X size={18} />

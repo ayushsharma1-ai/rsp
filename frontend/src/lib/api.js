@@ -22,9 +22,11 @@ function endSession() {
   localStorage.removeItem('token')
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('user')
-  // Reload so the app re-reads (now empty) auth state. Under HashRouter this lands
-  // a protected route on the login screen; a public route (calendar) just shows
-  // logged-out. Anonymous callers (no refresh token) never reach here.
+  // Land on the LOGIN page and say why (LoginV3 reads the flag). The old
+  // behaviour — silently reloading wherever you were — stripped the tab bar and
+  // buttons with zero explanation; the audit logged it as "buttons get vanished".
+  sessionStorage.setItem('rsp-session-expired', '1')
+  window.location.hash = '#/login'
   window.location.reload()
 }
 

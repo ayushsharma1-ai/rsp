@@ -83,7 +83,53 @@ aren't willing to maintain rosters, options B–E below are not available at all
 
 # 2. Requesting a slot without creating an event first
 
-**Status:** not built. Today, the only way to request a room is to *start creating a
+**Status: DECIDED and built (2026-07-22).** We deliberately kept "fill in the event
+first". The decision below settles the acceptance question this section raised.
+
+> ## Decision — details first, transfer on accept, first come first served
+>
+> **Options A + D** for how you ask — tap the event you want (**"Request this slot"**
+> on its detail sheet, added 2026-07-22) or hit the clash inside the create flow.
+> Both doors lead into the SAME flow: the detail-sheet path just pre-fills the slot's
+> date, time and room, leaving only title/groups/kind to type. Details always come
+> first. And **D2 (transfer)** for what acceptance does — with the transfer made
+> atomic, which is what removes D2's stated weakness.
+>
+> **How it works.** You fill in the event normally. If the room clashes, that's a fork,
+> not a dead end: **Pick another time** (everything you typed moves with you) or
+> **Request this slot** (everything you typed is sent to the holder). On accept, the
+> holder's booking is cancelled or shifted and *your event is created in the freed slot
+> in the same transaction*.
+>
+> **Why this and not D3 (release + short hold).** The hold only exists to give the
+> requester time to fill in details after the slot is freed — and a window in which a
+> third party could take it. Capturing details up front deletes that window entirely:
+> there is nothing left to fill in and nothing to race for. Create-first doesn't
+> complement the hold, it makes it unnecessary. No timers, no expiry edge cases.
+>
+> **Why no draft/"pending" event.** The details live on the request
+> (`requested_event_json`), not as an Event row. Nothing appears on the calendar until
+> someone accepts, so there is no draft state for every screen to special-case, no
+> orphan when a request is declined, and nothing to garbage-collect.
+>
+> **Races (contradiction 3 below) — resolved: first come, first served.** Open requests
+> are queued by `created_at` (`queue_position`, 1 = asked first) and the holder sees the
+> earliest at the top. Accepting one **auto-declines every other open request for that
+> booking**, each told who beat them. The holder can no longer accept a slot they've
+> already given away.
+>
+> **Contradiction 2 (bypasses validation) does not apply** — the request is built by the
+> create flow, so it has a title, a real room and a valid time by construction.
+>
+> **Still open:** response deadline / what silence means, rate limiting per person per
+> booking, and role restrictions on who may ask. Political point 2 (refusal becomes a
+> record) is *sharpened* by this design: the holder now declines a named, described
+> event rather than an anonymous request. That is intended, and it is real social
+> pressure.
+
+The rest of this section is the original analysis that led to that decision.
+
+**Original status:** not built. The only way to request a room is to *start creating a
 clashing event*, at which point a "Request" button appears.
 
 ## What it is
@@ -136,7 +182,10 @@ And orthogonally — **what does acceptance actually do?**
    aimed at whoever teaches in the nicest room.
 
 ## Open questions for the team
-- **Release, transfer, or hold** on acceptance? (This is the decision that matters most.)
+- ~~**Release, transfer, or hold** on acceptance?~~ — **settled: atomic transfer.** See
+  the decision box at the top of this section.
+- ~~**Races** — two people request the same slot.~~ — **settled: first come, first
+  served**; accepting one auto-declines the rest.
 - Is there a **response deadline**, and what happens on silence?
 - **Rate limit** per person per booking?
 - Any **role restrictions** on who may request?

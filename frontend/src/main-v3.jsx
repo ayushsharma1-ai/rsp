@@ -19,15 +19,27 @@ import { KindsV3 } from './v3/KindsV3'
 import { FeedbackInboxV3 } from './v3/FeedbackInboxV3'
 // Feedback is unchanged from v2 (no bottom sheet) — reused as-is.
 import { FeedbackScreen } from './mobile/pages/FeedbackScreen'
-import { initPalettes } from './v3/palettes'
 
-// Apply the saved accent palette before first paint (and keep it in sync with
-// light/dark flips). The neutral base lives in v3.css; palettes swap accents only.
-initPalettes()
+// The palette switcher was retired 2026-07-22 — one official identity (Klein
+// blue duo), fully defined in v3.css. Drop any palette a device saved back then.
+localStorage.removeItem('rsp-palette')
+
+// (The old JS viewport-height sync was removed 2026-07-23. The shell is now
+// `position: fixed; inset: 0` in v3.css, so the browser tracks the real usable
+// height itself — no measuring, nothing to go stale on a bfcache restore.)
 
 function RequireAuth({ children }) {
   const { token } = useAuthStore()
   return token ? children : <Navigate to="/login" replace />
+}
+
+// Admin-only screens. The API is the real boundary, but without this a professor
+// who reached #/users by URL or back-button got a full "Add member" form above an
+// empty list — every action on it failing 403.
+function RequireAdmin({ children }) {
+  const { token, user } = useAuthStore()
+  if (!token) return <Navigate to="/login" replace />
+  return user?.role === 'admin' ? children : <Navigate to="/" replace />
 }
 
 function AppV3() {
@@ -44,12 +56,12 @@ function AppV3() {
           <Route path="settings" element={<RequireAuth><SettingsV3 /></RequireAuth>} />
           <Route path="bookings" element={<RequireAuth><BookingsV3 /></RequireAuth>} />
           <Route path="groups" element={<RequireAuth><GroupsV3 /></RequireAuth>} />
-          <Route path="users" element={<RequireAuth><UsersV3 /></RequireAuth>} />
+          <Route path="users" element={<RequireAdmin><UsersV3 /></RequireAdmin>} />
           <Route path="requests" element={<RequireAuth><RequestsV3 /></RequireAuth>} />
-          {/* admin areas — the API enforces admin-only; these just surface it */}
-          <Route path="rooms" element={<RequireAuth><ResourcesV3 /></RequireAuth>} />
-          <Route path="kinds" element={<RequireAuth><KindsV3 /></RequireAuth>} />
-          <Route path="feedback-inbox" element={<RequireAuth><FeedbackInboxV3 /></RequireAuth>} />
+          {/* admin areas — the API enforces admin-only; these mirror it in the UI */}
+          <Route path="rooms" element={<RequireAdmin><ResourcesV3 /></RequireAdmin>} />
+          <Route path="kinds" element={<RequireAdmin><KindsV3 /></RequireAdmin>} />
+          <Route path="feedback-inbox" element={<RequireAdmin><FeedbackInboxV3 /></RequireAdmin>} />
           <Route path="feedback" element={<RequireAuth><FeedbackScreen /></RequireAuth>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

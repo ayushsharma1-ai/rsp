@@ -41,6 +41,9 @@ python-dotenv==1.0.1
 python-jose==3.3.0
 python-multipart==0.0.9
 PyYAML==6.0.3
+# Bundled IANA timezone DB so zoneinfo.ZoneInfo('Asia/Kolkata') resolves on any host
+# (Windows has no system zoneinfo; needed to pin APP_TIMEZONE for user-facing times).
+tzdata==2025.1
 rich==15.0.0
 rich-toolkit==0.19.9
 rsa==4.9.1

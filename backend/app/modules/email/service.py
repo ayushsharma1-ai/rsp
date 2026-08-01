@@ -94,7 +94,7 @@ def build_ics(uid: str, summary: str, start: datetime, end: datetime,
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//RSP//Scheduler//EN",
+        "PRODID:-//Scheduler//Scheduler//EN",
         "METHOD:REQUEST",
         "BEGIN:VEVENT",
         f"UID:{uid}",
@@ -197,9 +197,18 @@ def on_release_requested(payload):
 
 
 def on_release_accepted(payload):
+    # Do NOT say "it is now free — you can book it". Two things were wrong with that:
+    # accepting AUTO-CREATES the requester's event whenever the request carried a
+    # proposed_event (which the app always sends), so there is nothing left to book;
+    # and on the rare path where auto-create did not run, "free" is a claim about a
+    # shared resource made in an email that may be read hours later — by then somebody
+    # else may hold it. The in-app notification already branches on created_event_id
+    # (see notifications/service.py); this one never did.
     _send_release_email(payload, "requester", "Your slot request was accepted",
         lambda r: f"{r.holder.full_name if r.holder else 'The holder'} released the slot you requested. "
-                  f"It is now free — you can book it.")
+                  + ("Your event is on the calendar."
+                     if getattr(r, "created_event_id", None)
+                     else "Open Scheduler to book it."))
 
 
 def on_release_declined(payload):

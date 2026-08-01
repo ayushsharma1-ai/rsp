@@ -17,6 +17,9 @@ class FeedbackCreate(BaseModel):
     page_url:  Optional[str] = None
     page_name: Optional[str] = None
     browser:   Optional[str] = None
+    # Sender chose not to record their identity. They still must be signed in to
+    # submit (spam guard) — we simply never store or forward WHO it was.
+    anonymous: bool = False
 
 
 class FeedbackOut(BaseModel):
@@ -92,20 +95,26 @@ class FeedbackService:
         if len(data.message) > 2000:
             raise HTTPException(status_code=400, detail="Message too long (max 2000 chars)")
 
+        # Honour the "anonymous" choice. Previously submit() ignored data.anonymous and
+        # ALWAYS stored user_id = actor.id — so a message the sender marked anonymous
+        # still recorded and displayed their identity in the admin inbox (a broken
+        # privacy promise). When anonymous, we also drop the browser string so the
+        # sender can't be fingerprinted, and forward to Discord without the identity.
+        is_anon = bool(data.anonymous)
         fb = Feedback(
-            user_id      = actor.id if actor else None,
+            user_id      = None if is_anon else (actor.id if actor else None),
             message      = data.message.strip(),
             category     = data.category,
             page_url     = data.page_url,
             page_name    = data.page_name,
-            browser      = data.browser,
+            browser      = None if is_anon else data.browser,
         )
         self.db.add(fb)
         self.db.commit()
         self.db.refresh(fb)
 
-        # Send to Discord in background (best effort)
-        _send_to_discord(fb, actor)
+        # Send to Discord in background (best effort) — no identity when anonymous.
+        _send_to_discord(fb, None if is_anon else actor)
 
         return fb
 

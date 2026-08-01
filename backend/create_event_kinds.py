@@ -17,10 +17,15 @@ from app.core.database import Base, engine, SessionLocal
 from app.modules import models  # noqa: F401 — registers all models on Base
 from app.modules.models import EventKind
 
+# Notion's tag palette (chosen 2026-07-23). Muted and inky rather than app-bright,
+# which is what suits the cream-paper / graphite canvases. Hues sit far apart so
+# kinds are tellable at a glance, and all of them stay clear of the Klein action
+# blue and the ochre "today/now" accent — content must never look like chrome.
+# Re-running this script refreshes these three by name.
 SEED = [
-    ("Class", "#a8741c"),     # ochre — the gallery theme's warm secondary
-    ("Workshop", "#4f8a80"),  # muted teal
-    ("Talk", "#b3603c"),      # terracotta
+    ("Class", "#0B6E99"),     # Notion blue
+    ("Workshop", "#0F7B6C"),  # Notion green
+    ("Talk", "#AD1A72"),      # Notion pink
 ]
 
 

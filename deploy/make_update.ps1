@@ -1,5 +1,5 @@
 # ============================================================================
-#  RSP — build an update bundle on your laptop (Windows / PowerShell).
+#  RSP - build an update bundle on your laptop (Windows / PowerShell).
 #
 #  Usage:   powershell -File deploy\make_update.ps1
 #  Output:  D:\rsp_project_v2\rsp_update.tar.gz
@@ -8,9 +8,9 @@
 #           ssh vmadmin@<VM_IP> "bash /opt/rsp/deploy/apply_update.sh"
 #
 #  Packs: the backend source (no venv, no __pycache__, no .env) and the freshly
-#  built frontend. Small (~2-3 MB) — dependencies aren't re-shipped.
+#  built frontend. Small (~2-3 MB) - dependencies aren't re-shipped.
 #  If requirements.txt changed you ALSO need a new wheels bundle (the VM can't
-#  reach PyPI) — rebuild the full offline bundle in that case.
+#  reach PyPI) - rebuild the full offline bundle in that case.
 # ============================================================================
 $ErrorActionPreference = "Stop"
 
@@ -45,7 +45,25 @@ Get-ChildItem (Join-Path $stage "deploy") -Filter *.sh -Recurse | ForEach-Object
 
 Write-Host "==> Packing $out ..." -ForegroundColor Cyan
 if (Test-Path $out) { Remove-Item -Force $out }
-tar -czf $out -C $stage .
+# Run from the parent and use RELATIVE paths. An absolute "D:\..." argument makes GNU
+# tar read the drive letter as a remote host ("Cannot connect to D: resolve failed"),
+# which it does whenever Git's /usr/bin is ahead of Windows' bsdtar on PATH. Neither
+# tar can misread a relative path, and --force-local would fix GNU tar while breaking
+# bsdtar, which does not have that flag.
+$startedAt = Get-Date
+Push-Location (Split-Path $repo -Parent)
+try { tar -czf (Split-Path $out -Leaf) -C (Split-Path $stage -Leaf) . }
+finally { Pop-Location }
+# FRESHNESS, not mere existence. `Test-Path` alone was the bug: when the frontend
+# build aborted partway (a node WARNING on stderr is enough - $ErrorActionPreference
+# is Stop, and PowerShell wraps native stderr as a terminating NativeCommandError),
+# the PREVIOUS tarball was still sitting there, this check passed, and the script
+# reported "Bundle ready" for an artifact hours old. Two rounds of verification then
+# ran against stale bytes. Compare the write time instead.
+if (-not (Test-Path $out)) { throw "tar produced no bundle." }
+if ((Get-Item $out).LastWriteTime -lt $startedAt) {
+    throw "Bundle is STALE - tar did not rewrite $out (last written $((Get-Item $out).LastWriteTime)). The frontend build almost certainly failed above."
+}
 Remove-Item -Recurse -Force $stage
 
 $size = [math]::Round((Get-Item $out).Length / 1MB, 2)

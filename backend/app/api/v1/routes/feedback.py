@@ -16,7 +16,9 @@ def submit_feedback(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    fb = FeedbackService(db).submit(data, current_user)
+    # anonymous: login is still required (spam guard), but the identity is dropped
+    # HERE, before the service layer — nothing downstream ever sees who sent it.
+    fb = FeedbackService(db).submit(data, None if data.anonymous else current_user)
     return {"id": fb.id, "message": "Feedback submitted. Thank you!"}
 
 

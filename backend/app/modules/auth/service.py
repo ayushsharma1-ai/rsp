@@ -68,8 +68,14 @@ def get_current_user(
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     user = db.query(User).filter(User.id == payload.get("sub")).first()
-    if not user or not user.is_active:
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not user.is_active:
+        # Distinct message: the account exists but was deactivated (e.g. by an admin
+        # mid-session). "User not found" here was misleading — the person is real and
+        # would wonder why they were suddenly signed out.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Your account has been deactivated. Contact an administrator.")
     return user
 
 
@@ -149,7 +155,8 @@ class AuthService:
         if not user or not verify_password(req.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         if not user.is_active:
-            raise HTTPException(status_code=403, detail="Account disabled")
+            raise HTTPException(status_code=403,
+                                detail="Your account has been deactivated. Contact an administrator.")
         return self._make_token(user)
 
     def _make_token(self, user: User) -> TokenResponse:

@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { Plus, MapPin, Users as UsersIcon } from 'lucide-react'
 import api from '../lib/api'
-import { ListSkeleton, Empty, Btn, useSnack } from '../mobile/ui'
+import { ListSkeleton, Empty, LoadError, Btn, useSnack } from '../mobile/ui'
 import { haptic } from '../mobile/theme'
 import SheetV3 from './SheetV3'
+import { APPROVALS_ENABLED } from './features'
+import { errText } from '../mobile/lib'
 
 // Must match the backend ResourceType enum.
 const TYPES = [
@@ -20,13 +22,15 @@ const typeLabel = (t) => (TYPES.find(x => x[0] === t) || [null, t])[1]
 export function ResourcesV3() {
   const snack = useSnack()
   const [items, setItems] = useState(null)
+  const [failed, setFailed] = useState(false)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null)
 
   // active_only=false so admins can see and revive deactivated rooms too
   const load = useCallback(() => {
+    setFailed(false)
     api.get('/resources', { params: { active_only: false } })
-      .then(r => setItems(r.data)).catch(() => setItems([]))
+      .then(r => setItems(r.data)).catch(() => { setItems([]); setFailed(true) })
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -37,13 +41,14 @@ export function ResourcesV3() {
       </Btn>
 
       <div className="m-muted" style={{ fontSize: '0.78rem', margin: '0 2px 10px' }}>
-        Rooms here are what events book. The names must match the venue list in the app
-        (601H-N, 601H-O, 601H-P) for those buttons to reserve a real room.
+        Rooms added here are bookable straight away. Deactivate rather than delete to
+        keep a room’s booking history.
       </div>
 
       {items === null ? <ListSkeleton h={76} /> :
-        items.length === 0 ? <Empty icon="🚪" text="No rooms yet. Add one to start booking." /> :
-          <div style={{ display: 'grid', gap: 10 }}>
+        failed ? <LoadError what="the room list" onRetry={load} /> :
+        items.length === 0 ? <Empty icon="🚪" text="No rooms yet." /> :
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10 }}>
             {items.map(r => (
               <button key={r.id} className="m-card m-eventrow" style={{ textAlign: 'left', opacity: r.is_active ? 1 : 0.55 }}
                 onClick={() => { haptic(); setEditing(r) }}>
@@ -92,13 +97,13 @@ function AddRoomSheet({ open, onClose, onDone, snack }) {
         requires_approval: f.requires_approval,
       })
       snack('Room added'); onDone()
-    } catch (err) { setError(err.response?.data?.detail || 'Could not add the room.') }
+    } catch (err) { setError(errText(err, 'Could not add the room.')) }
     finally { setLoading(false) }
   }
 
   return (
     <SheetV3 open={open} onClose={onClose} title="Add room">
-      <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
+      <form onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
         <div><label className="m-label">Name</label>
           <input className="m-input" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="601H-N" /></div>
         <div><label className="m-label">Type</label>
@@ -110,11 +115,18 @@ function AddRoomSheet({ open, onClose, onDone, snack }) {
         <div><label className="m-label">Capacity</label>
           <input className="m-input" type="number" min="1" value={f.capacity}
             onChange={e => setF({ ...f, capacity: e.target.value })} placeholder="Optional" /></div>
-        <label className="m-listbtn" style={{ justifyContent: 'flex-start', gap: 10 }}>
-          <input type="checkbox" checked={f.requires_approval}
-            onChange={e => setF({ ...f, requires_approval: e.target.checked })} />
-          <span style={{ fontWeight: 500 }}>Bookings need admin approval</span>
-        </label>
+        {/* Hidden while approvals are off — see features.js. Ticking this is what
+            CREATES pending bookings, and with Approve/Reject gone from the Bookings
+            page there would be nothing able to resolve them. The value is still sent
+            (false for a new room), so the column keeps its meaning for when the flow
+            comes back. */}
+        {APPROVALS_ENABLED && (
+          <label className="m-listbtn" style={{ justifyContent: 'flex-start', gap: 10 }}>
+            <input type="checkbox" checked={f.requires_approval}
+              onChange={e => setF({ ...f, requires_approval: e.target.checked })} />
+            <span style={{ fontWeight: 500 }}>Bookings need admin approval</span>
+          </label>
+        )}
         {error && <p className="m-error">{error}</p>}
         <Btn type="submit" variant="primary" full loading={loading}>Add room</Btn>
       </form>
@@ -149,13 +161,13 @@ function EditRoomSheet({ room, onClose, onDone, snack }) {
         is_active: f.is_active,
       })
       snack('Room updated'); onDone()
-    } catch (e) { setError(e.response?.data?.detail || 'Could not update.') }
+    } catch (e) { setError(errText(e, 'Could not update.')) }
     finally { setLoading(false) }
   }
 
   return (
     <SheetV3 open={!!room} onClose={onClose} title={`Edit: ${room.name}`}>
-      <div style={{ display: 'grid', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
         <div className="m-muted" style={{ fontSize: '0.8rem' }}>Type: {typeLabel(room.resource_type)}</div>
         <div><label className="m-label">Name</label>
           <input className="m-input" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>
@@ -164,19 +176,21 @@ function EditRoomSheet({ room, onClose, onDone, snack }) {
         <div><label className="m-label">Capacity</label>
           <input className="m-input" type="number" min="1" value={f.capacity}
             onChange={e => setF({ ...f, capacity: e.target.value })} placeholder="Optional" /></div>
-        <label className="m-listbtn" style={{ justifyContent: 'flex-start', gap: 10 }}>
-          <input type="checkbox" checked={f.requires_approval}
-            onChange={e => setF({ ...f, requires_approval: e.target.checked })} />
-          <span style={{ fontWeight: 500 }}>Bookings need admin approval</span>
-        </label>
+        {/* Hidden while approvals are off — see features.js. Note this form SEEDS
+            f.requires_approval from the room and sends it back unchanged, so editing a
+            room that already carries the flag does not silently clear it. */}
+        {APPROVALS_ENABLED && (
+          <label className="m-listbtn" style={{ justifyContent: 'flex-start', gap: 10 }}>
+            <input type="checkbox" checked={f.requires_approval}
+              onChange={e => setF({ ...f, requires_approval: e.target.checked })} />
+            <span style={{ fontWeight: 500 }}>Bookings need admin approval</span>
+          </label>
+        )}
         <label className="m-listbtn" style={{ justifyContent: 'flex-start', gap: 10 }}>
           <input type="checkbox" checked={f.is_active}
             onChange={e => setF({ ...f, is_active: e.target.checked })} />
           <span style={{ fontWeight: 500 }}>Room is active (bookable)</span>
         </label>
-        <div className="m-muted" style={{ fontSize: '0.76rem' }}>
-          Deactivating hides a room from new bookings without deleting its history.
-        </div>
         {error && <p className="m-error">{error}</p>}
         <Btn variant="primary" full loading={loading} onClick={save}>Save changes</Btn>
       </div>

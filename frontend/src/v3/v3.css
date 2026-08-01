@@ -1,61 +1,196 @@
 /* ============================================================
-   RSP v3 — calendar-first redesign. Standalone design system
-   (own copy so v2 stays untouched). Follows OS light/dark.
+   RSP v3 — the department's official design system. ONE identity,
+   defined once per theme (the palette switcher and its 13
+   experimental palettes were removed 2026-07-22):
+
+     · DAY   — cool white + ink, Google Blue #1a73e8 as the single
+               action colour (was International Klein Blue #002fa7).
+     · NIGHT — warm graphite, periwinkle #93a5ff standing in for
+               IKB (true Klein blue dies on dark backgrounds).
+     · DUO   — brand marks ACTION (buttons, links, FAB);
+               --accent-2 (ochre/amber) marks TIME (today, now line).
+
+   Follows OS light/dark via [data-theme].
    ============================================================ */
 :root {
-  --brand: #5b6ef5;
-  --brand-press: #4a5be0;
   --radius: 16px;
   color-scheme: dark;          /* native selects / date pickers render dark */
-  /* dark — tuned for readable contrast (text ≥ 7:1, muted ≥ 4.5:1) */
-  --bg: #0c0e15;
-  --surface: #171b27;
-  --surface-2: #232838;
-  --border: rgba(255,255,255,0.13);
-  --text: #f3f5fb;
-  --text-2: #b6bfd0;
-  --text-3: #8b95a8;
-  --danger: #fb8c8c;
-  --ok: #4ade80;
+  /* night — COOL NEUTRAL + Google's dark-mode blue (2026-07-31).
+
+     This block used to read "warm graphite" and it was built to match a CREAM day
+     theme that was replaced on 2026-07-30. Nothing brought it along, so the app
+     shipped a warm-brown night against a cool-white day, with a COOL periwinkle
+     accent (#93a5ff) sitting on top of warm surfaces — two temperatures fighting,
+     which is what made it feel wrong rather than merely dark.
+
+     How warm it actually was, measured as red minus blue (0 = neutral):
+       --surface-2 #262219  +13     --text-2 #b4ab9a  +26     --text-3 #83796a  +25
+     For comparison: Netflix #141414 is 0, Discord #2b2d31 is -6, Google M3 #211f26
+     is -5. Not one reference app is warm; this was the outlier, in the opposite
+     direction, by roughly four times Discord's lean.
+
+     The accent is #8ab4f8, not the day theme's #1a73e8. Google makes exactly this
+     swap: #1a73e8 is a dark blue and needs a light ground under it. Same brand
+     decision, re-derived for a dark ground — 8.8:1 on the page, and the button
+     label sits at 8.2:1 on the fill.
+
+     Measured across this block: body text 13.1:1 on --surface, secondary 8.2:1,
+     tertiary 4.9:1 (clears AA for body text, not merely large text). */
+  --brand: #8ab4f8;
+  --brand-press: #6fa0f0;
+  --bg: #131316;
+  --surface: #1d1d21;
+  --surface-2: #27272c;
+  /* SOLID, not alpha. An alpha border takes the colour of whatever is behind it, so
+     it drifted between the page, a card and a sheet. Matches how the light theme
+     already does it (#dce0e7). 1.6:1 against --surface. */
+  --border: #3e3e46;
+  --text: #e3e3e6;
+  --text-2: #b4b4bb;
+  --text-3: #8a8a93;
+  --danger: #f2917f;
+  --ok: #81c784;
   --warn: #fcd34d;
-  --bar-bg: rgba(12,14,21,0.82);
-  --link: #8ea2ff;            /* brand, brightened for links on dark */
-  --on-accent: #0b0d15;       /* text sitting on a filled bright accent (dark mode) */
-  /* status accents — light/bright variants for the dark background */
+  --bar-bg: rgba(19,19,22,.86);
+  --link: #a8c7fa;            /* brand, brightened for links on dark */
+  --on-accent: #0b1b33;       /* deep navy text on the light blue accent */
+  --accent-2: #f5a623;        /* TIME accent — amber (today, now line) */
+  /* Flat, matching the day theme. A 135° gradient on a filled button is the one
+     piece of 2015 left in the UI, and it makes the accent read as two colours. */
+  --grad-brand: linear-gradient(#8ab4f8, #8ab4f8);
+  --grad-brand-press: linear-gradient(#6fa0f0, #6fa0f0);
+  --ease: cubic-bezier(.2,.8,.2,1);
+  /* Depth on a dark ground comes from a LIGHTER SURFACE, not a shadow — a black
+     shadow on a near-black page is invisible, which is the rule Discord, Netflix
+     and Material all follow. The shadows stay (they still seat a sheet against the
+     scrim) but they are no longer asked to carry elevation on their own; that is
+     --surface-hi's job, raised from .04 where it was too faint to register. */
+  --elev-1: 0 1px 2px rgba(0,0,0,.5);
+  --elev-2: 0 8px 26px rgba(0,0,0,.45);
+  --elev-3: 0 24px 64px rgba(0,0,0,.6);
+  --glow-brand: 0 4px 14px rgba(138,180,248,.20);
+  --hairline: inset 0 1px 0 rgba(255,255,255,.06);
+  --ring-focus: 0 0 0 3px rgba(138,180,248,.32);
+  --surface-hi: rgba(255,255,255,.05);
+  /* status accents — re-derived on the new ground */
   --st-pending: #fbbf24;
-  --st-confirmed: #4ade80;
-  --st-approved: #93b4ff;
-  --st-rejected: #fca5a5;
-  --st-cancelled: #9aa6ba;
+  --st-confirmed: #81c784;
+  --st-approved: #8ab4f8;
+  --st-rejected: #ef9a9a;
+  --st-cancelled: #9aa0aa;
+  /* "Go to TODAY" lozenge — lime, kept far from --st-confirmed on purpose */
+  --today-bg: #29331e;
+  --today-fg: #b6e86a;
+  --today-bd: rgba(182,232,106,.38);
 }
 [data-theme="light"] {
   color-scheme: light;
-  --bg: #f6f7fb;
+  /* day — COOL WHITE + ink + Google Blue. Two changes, both on 2026-07-30.
+
+     1. Ground: warm cream -> cool white. Cream is a reading surface; it earns its
+        warmth where a screen holds one column of prose and little chrome. This app
+        is the opposite — a dense timetable of borders, chips, badges and status
+        colours — and on cream every one of those edges picked up the warmth, so
+        the screen went yellow-grey and secondary text had nowhere to sit apart
+        from primary. These neutrals land within a point of the ramps Jira and
+        Google publish (#f7f8fa vs Atlassian's #f7f8f9, #dce0e7 vs #dcdfe4).
+
+     2. Action colour: IKB #002fa7 -> Google Blue #1a73e8. The ground was never
+        what made this feel unlike those apps; the accent was. A near-black navy
+        reads formal and heavy where #1a73e8 reads bright. 4.5:1 on white, which
+        is AA for text and comfortable for bold white labels on a filled button.
+        Note the trade: IKB gave 10.7:1, so this is a deliberate step down in
+        contrast for a step up in brightness. Do not go lighter than #1a73e8. */
+  --brand: #1a73e8;
+  --brand-press: #1967d2;
+  --bg: #f7f8fa;
   --surface: #ffffff;
-  --surface-2: #eef1f7;
-  --border: rgba(15,23,42,0.10);
-  --text: #14171f;
-  --text-2: #5b6373;
-  --text-3: #98a1b3;
-  --bar-bg: rgba(255,255,255,0.86);
-  --link: #4a5be0;
-  --on-accent: #ffffff;       /* text on a filled accent (light mode) */
-  /* status accents — darker variants for the light background */
-  --st-pending: #b45309;
-  --st-confirmed: #15803d;
-  --st-approved: #1d4ed8;
-  --st-rejected: #b91c1c;
-  --st-cancelled: #475569;
+  --surface-2: #edeff3;
+  /* SOLID, not alpha: an alpha border renders a different value over --bg,
+     --surface and --surface-2, so nested cards drew progressively darker
+     outlines for no design reason. A timetable's column edges are information. */
+  --border: #dce0e7;
+  --text: #16191d;
+  --text-2: #5a6371;
+  --text-3: #8b93a1;
+  --danger: #b3261e;           /* semantic colours re-tuned for cool white */
+  --ok: #0f7b3f;
+  --warn: #9a6a12;
+  --bar-bg: rgba(247,248,250,.86);
+  --link: #1967d2;            /* a step deeper than --brand: small text needs it */
+  --on-accent: #ffffff;
+  /* TIME accent, brightened to match. It was #b47a24, which went muddy the moment
+     the ground turned cool — it was picked to sit on cream. Google's amber. */
+  --accent-2: #e8710a;
+  /* FLAT fills. Google and Atlassian both use solid button colour; the 135deg
+     gradient was the other thing marking this out as not-quite-theirs. Kept as a
+     gradient token so no component has to change. */
+  --grad-brand: linear-gradient(#1a73e8, #1a73e8);
+  --grad-brand-press: linear-gradient(#1967d2, #1967d2);
+  /* Neutral, shallow shadows. A white card already separates from the #f7f8fa
+     ground on its own, so depth no longer has to be carried by shadow — and
+     warm shadow on cool white was the single strongest "dated" tell. Real
+     shadow is reserved for the one thing that genuinely floats: the sheet. */
+  --elev-1: 0 1px 2px rgba(16,24,40,.05);
+  --elev-2: 0 4px 12px rgba(16,24,40,.07);
+  --elev-3: 0 20px 48px rgba(16,24,40,.14);
+  --glow-brand: 0 1px 2px rgba(60,64,67,.30), 0 1px 3px 1px rgba(60,64,67,.15);
+  /* A white surface has nothing for a top highlight to catch, so this renders
+     nothing — but it must stay a VALID shadow layer. `none` is not one, and since
+     --hairline is composed into ten `box-shadow: var(--elev-N), var(--hairline)`
+     lists, using it invalidated every one of those declarations and silently
+     stripped elevation from cards, sheets, buttons and the tab bar. */
+  --hairline: inset 0 0 0 0 transparent;
+  --ring-focus: 0 0 0 3px rgba(26,115,232,.28);
+  /* .m-card lays this over --surface as a top gradient. On cream it was a white
+     highlight that lifted the card off the paper. On white there is nothing to
+     lift TO, and a darkening tint (tried first) just made every card grey at the
+     top and slightly dirty. A pure white card against the #f7f8fa ground plus a
+     1px rule is the separation — no gradient needed. */
+  --surface-hi: transparent;
+  /* status accents — tuned for cool white, aligned to the semantic colours */
+  --st-pending: #a85b08;
+  --st-confirmed: #0f7b3f;
+  --st-approved: #1a73e8;
+  --st-rejected: #b3261e;
+  --st-cancelled: #5a6371;
+  /* light twin of the lozenge — 5.65:1, AA */
+  --today-bg: #ecf5db;
+  --today-fg: #3d6b00;
+  --today-bd: rgba(61,107,0,.32);
 }
+/* How much chrome sits at the bottom of the screen. Everything anchored down
+   there (FAB, selection bar, snackbar) measures from THIS instead of hardcoding
+   a number, so the layers stop colliding when the tab bar isn't rendered.
+   AppShellV3 stamps data-tabbar on <html>; the bar exists only when signed in. */
+:root { --bottom-chrome: env(safe-area-inset-bottom); }
+:root[data-tabbar="on"] { --bottom-chrome: calc(62px + env(safe-area-inset-bottom)); }
+
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }   /* no iOS rotate text-inflation */
-html, body { height: 100%; margin: 0; }
+/* 16px FLOOR on every form control. iOS Safari zooms the entire page in when a
+   focused field is smaller than 16px, and it never zooms back out — the app is
+   left permanently magnified and scrolling sideways. The UA default for form
+   controls is 13.33px, which caught the hidden <input type="date"> behind every
+   DateJump. This is an element selector, so any class rule (.m-input etc.) still
+   wins; it only sets the floor for controls that specify nothing. Buttons are
+   deliberately NOT included — they never trigger the zoom, and resizing them
+   would change layout for no benefit. */
+input, select, textarea { font-size: 16px; }
+/* The DOCUMENT never scrolls — every scroller is inside the app shell. Without
+   this lock, iOS let the page itself rubber-band: stretch it and the layout
+   "snapped" back into place, and fixed chrome could sit against a stale bottom
+   edge leaving a dead band under the tab bar. */
+html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
 body {
   font-family: 'DM Sans', system-ui, sans-serif;
   background: var(--bg); color: var(--text);
   -webkit-font-smoothing: antialiased; overscroll-behavior-y: none;
 }
-h1, h2, h3, .v-h { font-family: 'Syne', 'DM Sans', sans-serif; }
+/* 'Syne' was never loaded (v3.html only fetches DM Sans + Fraunces), so it silently
+   fell back to DM Sans. Dropped it to avoid the phantom reference; the gallery type
+   layer below assigns Fraunces to the display headings that want the serif. */
+h1, h2, h3, .v-h { font-family: 'DM Sans', sans-serif; }
 button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
 a { -webkit-tap-highlight-color: transparent; }
 .m-muted { color: var(--text-2); }
@@ -65,31 +200,88 @@ a { -webkit-tap-highlight-color: transparent; }
 .m-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
 .m-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px; border-radius: 14px; border: none; background: var(--surface-2); color: var(--text); font-weight: 600; cursor: pointer; transition: transform 0.08s, background 0.15s; }
 .m-btn:active { transform: scale(0.96); }
-.m-btn--primary { background: var(--brand); color: #fff; }
+.m-btn--primary { background: var(--brand); color: var(--on-accent); }
 .m-btn--primary:active { background: var(--brand-press); }
 .m-btn--ghost { background: transparent; }
 .m-btn--full { width: 100%; }
 .m-btn:disabled { opacity: 0.5; cursor: default; }
-.m-input { width: 100%; min-height: 48px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 1rem; }
-.m-input:focus { outline: none; border-color: var(--brand); }
+/* max-width caps it at its container even when a grid/flex parent would otherwise
+   let scaled system fonts push it outside the card (see LoginV3) */
+/* --m-input-h is the single source of truth for this control's height. The date/time
+   centring fix further down derives its line-height from it, so changing the height
+   here cannot silently un-fix the alignment on Safari. */
+.m-input { --m-input-h: 48px; width: 100%; max-width: 100%; min-width: 0; min-height: var(--m-input-h); padding: 0 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 1rem; }
+/* :focus-within so a composite field (a .m-input wrapper around a bare <input>,
+   e.g. the email + "@iitk.ac.in" row) lights up when its inner input is focused,
+   same as a plain .m-input. :focus-within is a superset of :focus, so plain inputs
+   are unchanged. */
+.m-input:focus, .m-input:focus-within { outline: none; border-color: var(--brand); }
 textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; padding-top: 12px; }
 .m-label { display: block; font-size: 0.8rem; color: var(--text-2); margin: 0 0 6px 2px; font-weight: 600; }
 .m-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; background: var(--surface-2); color: var(--text-2); text-transform: capitalize; }
-.m-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; }
+.m-avatar { flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; background: var(--brand); color: var(--on-accent); display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; }
 .m-eventrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; border: 1px solid var(--border); cursor: pointer; }
 .m-section-title { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); font-weight: 700; margin: 18px 2px 10px; }
 .m-listbtn { display: flex; align-items: center; gap: 12px; width: 100%; color: var(--text); font-weight: 600; cursor: pointer; }
+/* Settings rows (a .m-card wrapping a .m-listbtn) hold either a chevron (~52px row)
+   or the 28px theme switch (~62px row); pin a floor so the switch row doesn't stand
+   ~8px taller than its neighbours. Scoped to the card variant so the bare .m-listbtn
+   labels (feedback/user checkboxes) are untouched. */
+.m-card.m-listbtn { min-height: 62px; }
 .m-listbtn svg { color: var(--text-2); }
 .m-listbtn:active { transform: scale(0.98); }
 .m-listbtn--danger { color: var(--danger); }
 .m-listbtn--danger svg { color: var(--danger); }
+/* min-width:0 + wrap: values are user text (organiser names, room lists, notes,
+   pasted links) and an unbroken string used to force the sheet to scroll sideways */
 .m-detailrow { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+.m-detailrow > span { min-width: 0; overflow-wrap: anywhere; }
 .m-detailrow:last-of-type { border-bottom: none; }
-.m-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; }
+/* A horizontally scrolling row with no edge treatment reads as a complete row.
+   On every iPhone width the Bookings status filters run past the viewport, so
+   "Rejected" and "Cancelled" were simply invisible with nothing to suggest a
+   swipe. The mask fades the last few pixels, which is the standard cue. */
+.m-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent); }
 .m-chips::-webkit-scrollbar { display: none; }
-.m-chip { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
-.m-chip--active { background: var(--brand); color: #fff; border-color: var(--brand); }
-.m-link { background: none; border: none; color: var(--link); font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; font-size: 0.84rem; }
+.m-chips::-webkit-scrollbar { display: none; }
+.m-chip { flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+.m-chip--active { background: var(--brand); color: var(--on-accent); border-color: var(--brand); }
+/* "Today" wears today's own amber so it pulls the eye toward jumping back */
+/* "Go to TODAY" — a green lozenge (2026-08-01).
+
+   THE LABEL MUST KEEP ITS VERB. It was shortened to bare "TODAY" and that was a
+   mistake: a month ahead in the calendar, a chip reading "TODAY" is read as a LABEL
+   ("this is today") rather than an action, which is exactly backwards — it appears
+   only when today is NOT on screen. "Go to" carries the verb; TODAY carries the
+   emphasis.
+
+   Colour history: amber (borrowed the "now" meaning), then plain white (semantically
+   right, invisible in practice), then tinted blue, now green at the owner's request.
+
+   The green is the LIME from the Jira reference, not Atlassian's teal-green, and that
+   choice is deliberate: I had flagged that green already means confirmed/ok here
+   (--ok, --st-confirmed). Measured, the lime is Δ138 from --st-confirmed where the
+   teal-green is only Δ93 — so the lime is the variant LEAST likely to be misread as a
+   status badge. Contrast: 5.65:1 light, 9.29:1 dark, both AA. */
+.m-chip--today {
+  background: var(--today-bg);
+  color: var(--today-fg);
+  border-color: var(--today-bd);
+  font-weight: 800; letter-spacing: .06em; font-size: 0.78rem;
+}
+/* "Go to" — quieter and un-tracked, so the eye lands on TODAY */
+.m-chip__pre {
+  font-weight: 600; letter-spacing: 0; opacity: .78;
+  margin-right: 5px; text-transform: none;
+}
+.m-chip--today:active { filter: brightness(0.96); }
+/* padding gives it a real tap area — as a bare 17px-tall link it was one of the
+   hardest things in the app to hit, and it's the "Request" action */
+.m-link { background: none; border: none; color: var(--link); font-weight: 600; cursor: pointer; padding: 8px 2px; min-height: 36px; text-decoration: underline; font-size: 0.84rem; }
+.m-link:disabled { opacity: 0.5; cursor: default; }
 
 /* status chips + badges — readable accent text in BOTH themes.
    Each variant just sets --accent; chip/badge styles read it. */
@@ -99,7 +291,7 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .stat--approved { --accent: var(--st-approved); }
 .stat--rejected { --accent: var(--st-rejected); }
 .stat--cancelled { --accent: var(--st-cancelled); }
-.stat { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: pointer; background: transparent; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.stat { flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: pointer; background: transparent; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); }
 .stat.is-on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .statbadge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: capitalize; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .m-warn { background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.40); border-radius: 14px; padding: 12px 14px; font-size: 0.88rem; }
@@ -110,17 +302,21 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-clash__head svg { color: var(--warn); flex: 0 0 auto; }
 .v-clash__item { margin-top: 10px; }
 .v-clash__name { font-weight: 600; font-size: 0.9rem; color: var(--text); }
-.v-clash__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
-.v-clash__tag { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
-.v-clash__tag--block { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
 .v-clash__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 9px 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; }
 .v-clash__room { font-size: 0.84rem; color: var(--text-2); min-width: 0; }
 .v-clash__room strong { color: var(--text); font-weight: 600; }
-.v-clash__btn { flex: 0 0 auto; border: none; border-radius: 9px; background: var(--brand); color: #fff; font-weight: 600; font-size: 0.8rem; padding: 8px 14px; cursor: pointer; transition: transform 0.08s, opacity 0.15s; }
-.v-clash__btn:active { transform: scale(0.95); }
-.v-clash__btn:disabled { opacity: 0.6; cursor: default; }
-.v-clash__sent { flex: 0 0 auto; font-size: 0.8rem; font-weight: 700; color: var(--ok); }
-.v-clash__block { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 0.82rem; font-weight: 600; color: var(--danger); }
+/* The two ways out of a clash: move, or ask for it. Stacked on a phone; side by
+   side once there's room, so they read as a pair of equal choices. */
+.v-clash__fork { display: grid; gap: 8px; margin-top: 12px; }
+@media (min-width: 460px) { .v-clash__fork { grid-auto-flow: column; grid-auto-columns: 1fr; } }
+.v-clash__hint { margin-top: 10px; font-size: 0.78rem; line-height: 1.5; color: var(--text-2); }
+.v-clash__hint strong { color: var(--text); font-weight: 600; }
+
+/* What a requester wants a contested slot for — shown to the holder so they can
+   judge the swap, and back to the requester as a record of what they asked for. */
+.v-wanted { margin-top: 8px; padding: 9px 11px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--border); }
+.v-wanted__title { font-weight: 600; font-size: 0.88rem; color: var(--text); }
+.v-wanted__meta { font-size: 0.78rem; color: var(--text-2); margin-top: 2px; }
 .m-spin { width: 22px; height: 22px; border: 2.5px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: m-spin 0.7s linear infinite; display: inline-block; }
 .m-skel { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: m-shimmer 1.3s linear infinite; border-radius: 10px; }
 .m-sheet-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.5); animation: m-fade 0.2s ease; }
@@ -129,7 +325,10 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .m-sheet__title { font-weight: 700; font-size: 1.2rem; margin: 0 0 12px; }
 .m-sheet__grab { touch-action: none; cursor: grab; user-select: none; }
 .m-sheet__grab:active { cursor: grabbing; }
-.m-snackbar { position: fixed; left: 16px; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 1002; background: var(--text); color: var(--bg); padding: 13px 16px; border-radius: 13px; font-size: 0.9rem; font-weight: 500; animation: m-slideup 0.25s ease; }
+/* Sits ABOVE the FAB and the selection bar (both anchored to --bottom-chrome),
+   and never eats a tap: at z-1002 with pointer events on, a 2.6s toast used to
+   swallow clicks on the FAB and completely cover the selection bar's buttons. */
+.m-snackbar { position: fixed; left: calc(16px + env(safe-area-inset-left)); right: calc(16px + env(safe-area-inset-right)); bottom: calc(var(--bottom-chrome) + 84px); z-index: 1002; pointer-events: auto; cursor: pointer; background: var(--text); color: var(--bg); padding: 13px 16px; border-radius: 13px; font-size: 0.9rem; font-weight: 500; animation: m-slideup 0.25s ease; }
 
 @keyframes m-slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes m-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -137,46 +336,159 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 @keyframes m-spin { to { transform: rotate(360deg); } }
 
 /* ---- v3 app shell ---- */
-.v-app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
-.v-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; background: var(--bar-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-bottom: 1px solid var(--border); }
+/* Fixed-viewport shell — pinned to the four viewport edges with position:fixed,
+   NOT sized by a height value. This is the whole fix for the recurring "grid is
+   tiny with a gap above the tab bar" bug: every height-based approach (100vh →
+   100dvh → a JS-measured --app-vh) eventually reported the wrong number on iOS
+   (stale after a bfcache restore, or measured before layout settled), so the
+   shell came out short and the fixed tab bar floated below it. `inset:0` has the
+   browser resolve the real usable height itself, live, with zero JS — it can't
+   go stale. .v-content is the one scroller inside it. */
+.v-app { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--bg); }
+.v-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top) + 12px) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left)); background: var(--bar-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-bottom: 1px solid var(--border); }
 .v-topbar__title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.01em; }
-.v-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface-2); color: var(--text); cursor: pointer; transition: transform 0.08s; }
+.v-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; border: none; background: var(--surface-2); color: var(--text); cursor: pointer; transition: transform 0.08s; }
 .v-iconbtn:active { transform: scale(0.9); }
-.v-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; padding-bottom: calc(80px + env(safe-area-inset-bottom) + 16px); }
+/* bottom padding is plain 16px now: the tab bar is in flow below the content,
+   so nothing needs to reserve space for an overlay any more */
+.v-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px calc(16px + env(safe-area-inset-right)) 16px calc(16px + env(safe-area-inset-left)); }
 
-.v-tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; align-items: flex-end; padding: 6px 10px calc(env(safe-area-inset-bottom) + 6px); background: var(--bar-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-top: 1px solid var(--border); }
-.v-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; min-height: 50px; border-radius: 12px; color: var(--text-3); text-decoration: none; font-size: 0.66rem; font-weight: 600; transition: color 0.15s, transform 0.08s; }
+/* IN-FLOW, not position:fixed — the bar is simply the last flex child of the
+   shell. A separately-fixed bar had to agree with the shell about where the
+   viewport bottom is, and on iOS they disagreed (stale viewport after restore /
+   rubber-band), leaving a dead band below the bar. In flow, a gap can't exist. */
+/* OPAQUE, not --bar-bg (2026-08-01). The tab bar used the same translucent token as
+   the topbar but WITHOUT the topbar's backdrop-filter — so content showed through
+   sharply at 14% instead of being blurred: the worst of both. The centre button
+   overhangs the bar by 22px, so as list rows scrolled under that strip the backdrop
+   behind the button changed row by row and it visibly flickered — flickering while a
+   row was behind it, settling in the gaps between rows, which is exactly what was
+   reported. An opaque bar removes the moving backdrop entirely.
+   The topbar keeps its translucency: it HAS the blur, so its backdrop is smooth. */
+.v-tabbar { flex: 0 0 auto; display: flex; align-items: flex-end; padding: 6px calc(10px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 6px) calc(10px + env(safe-area-inset-left)); background: var(--surface); border-top: 1px solid var(--border); }
+/* used by both NavLink <a> tabs and the centre <button> — reset button chrome */
+.v-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; min-height: 50px; border-radius: 12px; background: none; border: none; cursor: pointer; color: var(--text-3); text-decoration: none; font-size: 0.66rem; font-weight: 600; transition: color 0.15s, transform 0.08s; }
 .v-tab--active { color: var(--brand); }
 .v-tab:active { transform: scale(0.92); }
 .v-tab__dot { position: absolute; top: -3px; right: -5px; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--bar-bg); }
 /* centered calendar tab — raised pill */
 .v-tab--center { flex: 0 0 auto; }
-.v-tab--center .v-tab__badge { width: 56px; height: 56px; border-radius: 18px; background: var(--brand); color: #fff; display: grid; place-items: center; margin-top: -22px; box-shadow: 0 8px 22px rgba(91,110,245,0.45); }
+.v-tab--center .v-tab__badge { width: 56px; height: 56px; border-radius: 18px; background: var(--brand); color: var(--on-accent); display: grid; place-items: center; margin-top: -22px; box-shadow: var(--glow-brand); }
 .v-tab--center.v-tab--active { color: var(--brand); }
 
 /* ---- Calendar: header + view toggle ---- */
-.v-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+/* wraps on very narrow / zoomed screens instead of squashing the month title
+   into the Week|Month switch (audit: scaled-display iOS overlaps) */
+.v-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .v-cal-title { font-size: 1.15rem; font-weight: 800; }
+/* The title is also a jump-to-date target: a native date input sits invisibly on
+   top of it (same trick as .v-datejump) so tapping the month name opens the OS
+   calendar. Purely additive — the title looks unchanged. */
+.v-cal-title--jump { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.v-cal-title--jump input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: none; padding: 0; margin: 0; background: transparent; cursor: pointer; }
+.v-cal-title--jump input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
 .v-navrow { display: flex; align-items: center; gap: 6px; }
 .v-seg { display: inline-flex; background: var(--surface-2); border-radius: 12px; padding: 3px; gap: 2px; }
-.v-seg button { border: none; background: transparent; color: var(--text-2); font-weight: 600; font-size: 0.8rem; padding: 6px 12px; border-radius: 9px; cursor: pointer; }
+/* min-height: the Week/Month switch is primary navigation and was a ~28px target */
+.v-seg button { border: none; background: transparent; color: var(--text-2); font-weight: 600; font-size: 0.8rem; padding: 8px 14px; min-height: 44px; border-radius: 9px; cursor: pointer; }
 .v-seg button.v-seg--active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
 
 /* ---- Colored filters ---- */
-.v-filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; }
-.v-filters::-webkit-scrollbar { display: none; }
-.v-filter { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
-.v-filter__dot { width: 10px; height: 10px; border-radius: 50%; }
-.v-filter--on { color: var(--text); }
+/* Filters live behind the nav-row funnel now (chip rows removed 2026-07-24).
+   The button wears its state so a filtered calendar is always visibly filtered. */
+.v-filterbtn { position: relative; }
+.v-filterbtn--on { color: var(--brand); border-color: var(--brand); }
+/* -4px, not -5: the badge + its 2px ring protrude 6px past the button. The nav
+   row gives the pair exactly that much headroom (padding-top) and clearance
+   (gap 10px to the › button) — at -5 the ring landed ON the next arrow. */
+/* A plain presence dot — "a filter is on", no count. Sits inside the button's
+   corner with a ring so it reads clearly against the funnel glyph. */
+.v-filterdot { position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--bg); }
+/* sheet rows — Google-style checklist: dot · name · check */
+/* ── Filter sheet: category rail + options pane ───────────────────────────────
+   Categories left, that category's options right. Each pane scrolls on its own, so
+   a long room list never pushes the categories out of reach — the whole point.
+   Height is capped rather than free: the sheet itself is 88dvh, and without a cap
+   the two panes would just make it as tall as the longer one and scroll as a unit,
+   which is the flat list this replaced. */
+.v-fpanes {
+  display: flex; align-items: stretch; gap: 0;
+  height: min(56vh, 430px); min-height: 260px;
+  margin: 0 -16px;                       /* bleed to the sheet's edges */
+  border-top: 1px solid var(--border);
+}
+.v-frail {
+  flex: 0 0 32%; max-width: 148px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--surface-2); border-right: 1px solid var(--border);
+}
+.v-frail__cat {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  width: 100%; min-height: 52px; padding: 8px 10px 8px 14px;
+  background: none; border: none; border-left: 3px solid transparent;
+  color: var(--text-2); font-size: 0.88rem; font-weight: 600;
+  text-align: left; cursor: pointer;
+}
+/* the active category joins the right pane: same surface, no right border */
+.v-frail__cat.is-on {
+  background: var(--surface); color: var(--text);
+  border-left-color: var(--brand); font-weight: 700;
+}
+/* How many are picked in THIS category — visible from any other category, which is
+   the thing a stacked layout could not do. */
+.v-frail__n {
+  flex: 0 0 auto; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 10px; background: var(--brand); color: var(--on-accent);
+  font-size: 0.72rem; font-weight: 800; line-height: 20px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.v-fopts {
+  flex: 1 1 auto; min-width: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 0 16px;
+}
+.v-fopts .v-frow:last-child { border-bottom: none; }
+
+.v-frow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 4px 2px; background: none; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 0.95rem; font-weight: 500; cursor: pointer; text-align: left; }
+.v-frow--off .v-frow__label { color: var(--text-3); }
+.v-frow--off .v-frow__dot { opacity: 0.35; }
+.v-frow__dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+.v-frow__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-frow__box { width: 18px; height: 18px; border: 2px solid var(--text-3); border-radius: 6px; flex: 0 0 auto; }
+/* "All cohorts/rooms" header row — bold, and its dot slot is an invisible
+   spacer so its label lines up with the coloured rows below it. */
+.v-frow--all { font-weight: 700; }
+.v-frow__dot--none { background: transparent; }
+
+/* Capsule toggle (dark mode): a fixed track with a knob that SLIDES between
+   off and on. The row/track never scales — only the knob moves, so it reads as
+   a switch, not a throbbing button. */
+.v-switch { width: 46px; height: 28px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); position: relative; flex: 0 0 auto; transition: background .18s var(--ease, ease); }
+.v-switch--on { background: var(--brand); border-color: var(--brand); }
+/* The knob was pure #fff with a heavy shadow — fine on cream, but on the white
+   theme an OFF switch put a white knob on a near-white track and the only thing
+   holding it together was the shadow. A hairline border defines it in both themes
+   and lets the shadow drop back to something believable. */
+.v-switch__knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(16,24,40,.18); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.v-switch--on .v-switch__knob { transform: translateX(18px); }
+/* the theme row itself must not do the press-scale "heartbeat" */
+.m-listbtn.m-listbtn--switch:active { transform: none; }
+
+/* recurring scope chooser — a bold label over its plain-language consequence */
+.v-scopeopt { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: background .15s, transform .08s; }
+.v-scopeopt:active { background: var(--surface-2); transform: scale(0.99); }
+.v-scopeopt__label { font-weight: 600; font-size: 0.95rem; color: var(--text); }
+.v-scopeopt__sub { font-size: 0.8rem; color: var(--text-2); line-height: 1.35; }
 
 /* ---- Month grid ---- */
+/* padding-left matches the week grid's 34px time-gutter, so the 7 day columns
+   land in the SAME place in both views — no sideways jump when you switch. */
 .v-month__dow { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 4px; }
 .v-month__dow span { text-align: center; font-size: 0.68rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; }
-.v-month__grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+/* row-gap only: a 0 column-gap keeps the 7 columns the same width as the week
+   grid's, so day columns line up across views; weeks still breathe vertically. */
+.v-month__grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px 0; }
 .v-daycell { aspect-ratio: 1 / 1.15; border-radius: 12px; border: 1px solid transparent; background: var(--surface); display: flex; flex-direction: column; align-items: center; padding: 6px 0 0; cursor: pointer; transition: transform 0.06s; }
 .v-daycell:active { transform: scale(0.95); }
 .v-daycell--outside { opacity: 0.32; }
-.v-daycell--selected { border-color: var(--brand); }
 .v-daynum { font-size: 0.92rem; font-weight: 600; line-height: 1.3; }
 .v-daycell--today .v-daynum { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
 .v-daydots { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; margin-top: 3px; padding: 0 4px; }
@@ -200,18 +512,29 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 /* selection box (Google-style drag-to-create) */
 .v-selbox { position: absolute; left: 2px; right: 4px; background: color-mix(in srgb, var(--brand) 26%, transparent); border: 1.5px solid var(--brand); border-radius: 9px; z-index: 6; }
 .v-selbox__label { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 0.74rem; font-weight: 700; color: var(--text); }
-.v-selbox__handle { position: absolute; left: 50%; transform: translateX(-50%); width: 30px; height: 16px; cursor: ns-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }
+/* 56×28 hit area with the same 22×5 grip drawn inside — resizing a selection was
+   a 30×16 target, which is very hard to catch with a fingertip */
+.v-selbox__handle { position: absolute; left: 50%; transform: translateX(-50%); width: 56px; height: 28px; cursor: ns-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }
 .v-selbox__handle::after { content: ''; width: 22px; height: 5px; border-radius: 3px; background: var(--brand); box-shadow: 0 0 0 2px var(--surface); }
-.v-selbox__handle--top { top: -9px; }
-.v-selbox__handle--bot { bottom: -9px; }
+.v-selbox__handle--top { top: -15px; }
+.v-selbox__handle--bot { bottom: -15px; }
 
 /* selection action bar (above the tab bar) */
-.v-selbar { position: fixed; left: 12px; right: 12px; bottom: calc(82px + env(safe-area-inset-bottom)); z-index: 35; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); animation: m-slideup 0.22s ease; }
+/* The day grid owns its own scroller so the confirm bar can sit BELOW it in
+   normal flow. As a fixed overlay the bar covered whatever you'd just selected
+   near the bottom of the day (pick 8–9 PM, the bar landed on it). */
+.v-daygrid { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* margin-bottom clears the raised tab-bar "+" badge: it protrudes ~10px above the
+   bar and its brand glow reaches ~23px, which was bleeding onto (and crowding) the
+   strap's bottom edge. 8px lifts the strap bottom to ~24px above the bar, clearing both. */
+.v-selbar { flex: 0 0 auto; margin: 8px 0; max-height: 38vh; overflow-y: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--elev-2), var(--hairline); animation: m-slideup 0.22s ease; }
 
 /* ---- Week view ---- */
 .v-week__head { display: flex; margin-bottom: 6px; }
 .v-week__gutter { width: 34px; flex: 0 0 34px; }
-.v-week__dayhd { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: 9px; }
+/* min-height 44px: these are the buttons that jump to a day view, and they were
+   rendering 44 wide x 42 tall — two pixels under the iOS minimum. */
+.v-week__dayhd { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 44px; padding: 4px 0; border: none; background: transparent; color: var(--text-2); cursor: pointer; border-radius: 9px; }
 .v-week__dow { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; }
 .v-week__num { font-size: 0.95rem; font-weight: 700; color: var(--text); }
 .v-week__dayhd--today .v-week__num { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
@@ -223,6 +546,25 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-week__ev { position: absolute; left: 1px; right: 1px; border-radius: 4px; min-height: 12px; cursor: pointer; overflow: hidden; padding: 2px 3px; display: flex; flex-direction: column; }
 .v-week__ev-title { font-size: 0.58rem; font-weight: 700; line-height: 1.15; color: inherit; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
 .v-week__ev-time { font-size: 0.54rem; color: inherit; opacity: 0.8; }
+/* "+N" — the only hint in week view that a block is hiding others. Pinned to the
+   bottom-right because the title clamps to two lines from the top. Sized as small as
+   it can be and still be readable; it is a signifier, not a control the eye should
+   land on first. It IS tappable (→ the day view), and it deliberately breaks the
+   44px tap-target rule the rest of the app follows: at ~42px of column width there
+   is no room, and every pixel of the block around it is also tappable and leads
+   somewhere sensible (the event itself), so a mis-tap costs nothing. */
+.v-week__more {
+  position: absolute; right: 1px; bottom: 1px;
+  min-width: 15px; height: 13px; padding: 0 3px;
+  border: none; border-radius: 3px;
+  font-size: 0.5rem; font-weight: 800; line-height: 13px; letter-spacing: -0.02em;
+  background: rgba(0,0,0,.34); color: #fff;
+  cursor: pointer; z-index: 1;
+}
+/* Blocks are TINTED now (Option A), so they are always close to --surface in both
+   themes and the pill no longer needs a light/dark variant — one token pair reads
+   correctly on every block. The old .v-week__more--onlight class is gone with it. */
+.v-week__more { background: var(--text-2); color: var(--surface); }
 
 /* ---- Notifications (flat list, hairline dividers — not boxes) ---- */
 .v-notif-group { margin: 14px 2px 4px; font-size: 0.72rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -235,23 +577,151 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-notif__body { min-width: 0; flex: 1; }
 .v-notif__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .v-notif__title { font-weight: 600; font-size: 0.9rem; color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v-notif__msg { color: var(--text-2); font-size: 0.84rem; margin-top: 2px; line-height: 1.4; }
+/* One line, clamped — until you tap it. The detail line is now facts ("601H-O ·
+   Mon 3 Aug, 10:30 AM"), which fits; the few that are genuinely a sentence get an
+   ellipsis rather than wrapping to three lines and turning the list back into prose.
+   Tapping expands it in place; nothing navigates. */
+.v-notif__msg {
+  color: var(--text-2); font-size: 0.84rem; margin-top: 2px; line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v-notif__msg.is-open { white-space: normal; overflow: visible; text-overflow: clip; }
+/* Expanded footer: exact timestamp on the left, the one navigation action on the
+   right. Going somewhere is now something you choose, not something a tap does. */
+.v-notif__more {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; margin-top: 8px;
+}
+.v-notif__stamp { font-size: 0.74rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.v-notif__go {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 36px; padding: 6px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--brand); font-size: 0.8rem; font-weight: 700; cursor: pointer;
+}
+.v-notif__go:active { background: var(--surface); }
 .v-notif__time { flex: 0 0 auto; color: var(--text-3); font-size: 0.7rem; }
 .v-notif__dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); margin-top: 8px; }
 
+/* Explains why the create sheet is asking for details when you arrived from
+   "Request this slot" — brand-tinted, so it reads as guidance not a warning. */
+.v-reqnote { border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--border)); background: color-mix(in srgb, var(--brand) 8%, var(--surface)); border-radius: 14px; padding: 12px 14px; }
+.v-reqnote__head { font-weight: 700; font-size: 0.9rem; color: var(--text); margin-bottom: 4px; }
+.v-reqnote p { margin: 0; font-size: 0.82rem; line-height: 1.5; color: var(--text-2); }
+.v-reqnote strong { color: var(--text); font-weight: 600; }
+
+/* ---- start/end time fields (TimeRange.jsx — taps open the OS picker) ---- */
+.v-timerow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+/* iOS renders time inputs as tiny centered pills unless told otherwise */
+/* ── Date/time inputs: centre the value WebKit puts in a shadow element ───────
+   Found on a real iPhone 16e (iOS 26.3), invisible in every Chrome check I ran.
+
+   A normal text input centres its value for you — the browser wraps it in an
+   anonymous box and handles it. Date and time inputs do NOT: both engines render the
+   value into a shadow pseudo-element and position it by their own rules.
+
+     Safari  ::-webkit-date-and-time-value  — a BLOCK laid out at the TOP of the
+             content box. `.m-input` is `min-height: 48px; padding: 0 14px` — no
+             vertical padding, no line-height — so nothing fills the 48px and the
+             time sat visibly high.
+     Chrome  ::-webkit-datetime-edit        — centred internally by the engine,
+             which ignores the inherited line-height for placement.
+
+   Same CSS, two results, and the engine I could see locally was the one that
+   compensates. Hence a bug that survived every emulator pass.
+
+   line-height is what positions the Safari block, and it is derived from the box
+   rather than hardcoded so it follows if --m-input-h ever changes. Verified: Chrome
+   renders byte-identical with and without this (same SHA-256 of the screenshot), and
+   the Safari-only pseudo below matches nothing in Chrome, so it is inert there.
+
+   Applied to date AND time even though only `time` is currently visible in a
+   `.m-input` — the date fields are opacity:0 tap overlays inside .v-datejump today,
+   but nothing stops the next one being a plain visible field, and this is the second
+   time this behaviour has bitten (see the deleted text-align rule that used to live
+   further down, which patched the horizontal axis of the same problem). */
+input[type="time"].m-input { -webkit-appearance: none; appearance: none; display: block; width: 100%; }
+input[type="time"].m-input,
+input[type="date"].m-input,
+input[type="datetime-local"].m-input {
+  line-height: calc(var(--m-input-h) - 2px);   /* content box = height − 1px border each side */
+}
+input[type="time"].m-input::-webkit-date-and-time-value,
+input[type="date"].m-input::-webkit-date-and-time-value,
+input[type="datetime-local"].m-input::-webkit-date-and-time-value {
+  margin: 0;
+  text-align: left;
+  line-height: calc(var(--m-input-h) - 2px);
+}
+
 /* ---- Venue / group selectable pills (create flow) ---- */
+/* ── Create/edit form: WHAT and WHEN as one card ──────────────────────────────
+   Title, date and time answer a single question, so they sit in one bordered group
+   with hairline dividers instead of floating as three separate blocks a gap apart.
+   The title input loses its own border here — a box inside a box reads as two
+   containers, and the group already provides the edge. */
+.v-fieldgroup {
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface); overflow: hidden;
+}
+.v-fieldgroup__title {
+  width: 100%; border: none; background: none; color: var(--text);
+  font-size: 1.15rem; font-weight: 600; padding: 13px 14px; outline: none;
+  border-bottom: 1px solid var(--border);
+}
+.v-fieldgroup__title::placeholder { color: var(--text-3); font-weight: 500; }
+.v-fieldgroup__title:focus { background: var(--surface-2); }
+.v-fieldgroup__row { padding: 11px 14px; }
+.v-fieldgroup__row + .v-fieldgroup__row { border-top: 1px solid var(--border); }
+
+/* "N more rooms" / "Show fewer" under a collapsed picker. Full-width and 44px so it
+   is a real target, but ghost-weight so it never competes with Save. */
+.v-morebtn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; min-height: 44px; margin-top: 8px; padding: 8px 12px;
+  background: none; border: 1px solid var(--border); border-radius: 12px;
+  color: var(--brand); font-size: 0.86rem; font-weight: 650; cursor: pointer;
+}
+.v-morebtn:active { background: var(--surface-2); }
+
 .v-pickgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.v-pick { text-align: left; padding: 11px 12px; border-radius: 13px; border: 1.5px solid var(--border); background: var(--surface); cursor: pointer; }
+/* Fade the last row when the list is collapsed, so it reads as "there is more"
+   rather than "that is all". A hard cut is what makes people miss the More button
+   sitting underneath it. Masks the grid only — the button below stays fully opaque. */
+.v-pickgrid--faded {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), rgba(0,0,0,.35));
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), rgba(0,0,0,.35));
+}
+/* min-width:0 + hidden: as grid children these floor at min-content, so one long
+   unbroken room name blew the 2-up venue grid out of the sheet */
+.v-pick { text-align: left; padding: 11px 12px; border-radius: 13px; border: 1.5px solid var(--border); background: var(--surface); cursor: pointer; min-width: 0; overflow: hidden; }
 .v-pick--on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, var(--surface)); }
-.v-pick__label { font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
-.v-pick__sub { font-size: 0.74rem; color: var(--text-2); margin-top: 2px; }
-.v-pick__dot { width: 9px; height: 9px; border-radius: 50%; }
+.v-pick__label { font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.v-pick__label > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-pick__sub { font-size: 0.74rem; color: var(--text-2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* flex:0 0 auto or the colour dot squashes into an ellipse beside a long name */
+.v-pick__dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 
 /* ---- full-screen move-event picker (reuses the day grid) ---- */
-.v-moveoverlay { position: fixed; inset: 0; z-index: 1001; background: var(--bg); display: flex; flex-direction: column; }
+/* z-1100, above .m-sheet (1001): these pickers are opened FROM a sheet and must
+   cover it. It used to tie at 1001 and rely on portal mount order, with two of
+   three call sites patching it inline. */
+.v-moveoverlay { position: fixed; inset: 0; z-index: 1100; background: var(--bg); display: flex; flex-direction: column; }
 .v-moveoverlay__head { display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 12px) 12px 10px; border-bottom: 1px solid var(--border); background: var(--bar-bg); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); }
 .v-moveoverlay__nav { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 2px; }
-.v-moveoverlay__body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 16px; padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+/* tap-to-jump date control: pretty label with the OS date input invisible on top */
+.v-datejump { position: relative; display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+.v-datejump:active { background: var(--surface-2); }
+/* kill the WebKit date-input's own calendar icon — our label + chevron stand in */
+.v-datejump input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
+/* NOTE: a `::-webkit-date-and-time-value { text-align: left }` rule used to sit here.
+   Removed — DateJump's date input is `opacity: 0`, a transparent tap overlay over the
+   styled <span> label, so the rule was painting an invisible element. It was the
+   horizontal half of the same Safari shadow-element problem that showed up vertically
+   on the time inputs; both axes are now handled in one place, next to .m-input. */
+/* a flex column, NOT a scroller: DayGrid scrolls internally and keeps its confirm
+   bar in flow underneath, so the bar can never cover the slot you just picked */
+.v-moveoverlay__body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 16px calc(12px + env(safe-area-inset-bottom)); }
 
 /* ---- color swatches (custom event color-coding) ---- */
 .v-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -259,81 +729,38 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-swatch--on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
 .v-swatch--auto { background: var(--surface-2); color: var(--text-2); font-weight: 700; font-size: 0.8rem; display: grid; place-items: center; }
 
-/* ---- FAB ---- */
-.v-fab { position: fixed; right: 18px; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 25; width: 56px; height: 56px; border-radius: 18px; border: none; background: var(--brand); color: #fff; display: grid; place-items: center; box-shadow: 0 10px 26px rgba(91,110,245,0.45); cursor: pointer; transition: transform 0.1s; }
-.v-fab:active { transform: scale(0.9); }
+/* (the floating FAB was retired 2026-07-23 — creating runs from the tab-bar
+   centre "+" instead; see AppShellV3 / CalendarV3) */
 
 @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
 
 /* ---- desktop: centered phone column ---- */
-@media (min-width: 768px) {
-  .v-app { max-width: 460px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
-  .v-tabbar, .m-sheet { max-width: 460px; left: 50%; transform: translateX(-50%); }
-  .v-fab { right: calc(50% - 230px + 18px); }
+/* min-HEIGHT as well as min-width, because width alone cannot tell a tablet from a
+   phone lying on its side. iPhone 14 landscape is 844px wide and iPhone 15 Pro Max is
+   932px — both sail past 768 and used to get this iPad column: a 460px strip with 192px
+   and 236px of dead gutter, on a viewport only 390–430px tall. Measured, not guessed.
+   600px cleanly separates the two families: every phone in landscape is at most ~440px
+   tall (16 Pro Max), while a tablet's SHORT side starts at 744px (iPad mini). A phone
+   in landscape now keeps the full-width phone layout, which is what it wants. */
+@media (min-width: 768px) and (min-height: 600px) {
+  /* inset:0 already sets left/right:0; margin-inline:auto centres the 460 column */
+  .v-app { max-width: 460px; margin-inline: auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  /* (the tab bar is an in-flow child of .v-app, so it inherits the centred
+     460px column — no own centring rule needed) */
+  /* NOT transform-centred: SheetV3 writes an inline translateY() for the drag,
+     which replaces translateX(-50%) entirely and threw the sheet into the right
+     half of the screen on tablets (768px is iPad portrait, which we redirect to
+     v3). Centre with left/right/margin instead — same trick as the 960px block. */
+  .m-sheet { max-width: 460px; left: 0; right: 0; margin-inline: auto; }
+  .v-selbar { max-width: 436px; left: 0; right: 0; margin-inline: auto; }
   .m-snackbar { max-width: 428px; left: 50%; right: auto; transform: translateX(-50%); }
 }
 
 /* ============================================================
-   PREMIUM POLISH LAYER (v3) — depth, gradient accent, motion.
-   Appended last so it overrides the flat base. Delete this whole
-   block to revert to the original styling.
+   POLISH LAYER — depth, gradient accent, motion. Appended after
+   the flat base so these rules win. All colour comes from the
+   tokens at the top of this file; nothing below hardcodes a hue.
    ============================================================ */
-:root {
-  /* GALLERY × GRAPHITE — night mode. The warm graphite neutrals stay (identity
-     continuity); the accent becomes a periwinkle take on Klein blue (true IKB
-     dies on dark backgrounds). Amber survives as the warm secondary, carried by
-     event-kind colours and --accent-warm. */
-  --brand: #93a5ff;
-  --brand-press: #7d90f2;
-  --bg: #131211;
-  --surface: #1b1917;
-  --surface-2: #262219;
-  --border: rgba(255,255,255,.11);
-  --text: #f0ece3;
-  --text-2: #b4ab9a;
-  --text-3: #83796a;
-  --bar-bg: rgba(19,18,17,.82);
-  --link: #b3c0ff;
-  --accent-warm: #e0a64a;
-  --on-accent: #10143c;       /* deep navy text on the light periwinkle accent */
-  --grad-brand: linear-gradient(135deg, #a3b2ff 0%, #7d90f2 100%);
-  --grad-brand-press: linear-gradient(135deg, #7d90f2 0%, #6a7de6 100%);
-  --ease: cubic-bezier(.2,.8,.2,1);
-  --elev-1: 0 1px 2px rgba(0,0,0,.5);
-  --elev-2: 0 8px 26px rgba(0,0,0,.45);
-  --elev-3: 0 24px 64px rgba(0,0,0,.6);
-  --glow-brand: 0 5px 18px rgba(147,165,255,.22);
-  --hairline: inset 0 1px 0 rgba(255,255,255,.06);
-  --ring-focus: 0 0 0 3px rgba(147,165,255,.30);
-  --surface-hi: rgba(255,255,255,.04);
-}
-[data-theme="light"] {
-  /* GALLERY day mode — warm paper, warm ink, and International Klein Blue as
-     the single high-saturation accent (the documented pairing: IKB + creamy
-     white + charcoal). Ochre is the warm secondary. */
-  --brand: #002fa7;
-  --brand-press: #00257f;
-  --bg: #f7f4ec;
-  --surface: #fffdf7;
-  --surface-2: #efe9dc;
-  --border: rgba(32,27,18,.13);
-  --text: #1b1813;
-  --text-2: #6d665a;
-  --text-3: #9d947f;
-  --bar-bg: rgba(250,247,240,.86);
-  --link: #1f3fd0;
-  --accent-warm: #a8741c;
-  --on-accent: #ffffff;       /* white text on Klein blue */
-  --grad-brand: linear-gradient(135deg, #0d3cbe 0%, #002fa7 100%);
-  --grad-brand-press: linear-gradient(135deg, #00257f 0%, #001c62 100%);
-  --elev-1: 0 1px 2px rgba(42,35,20,.10);
-  --elev-2: 0 10px 26px rgba(42,35,20,.10);
-  --elev-3: 0 24px 64px rgba(42,35,20,.16);
-  --glow-brand: 0 8px 20px rgba(0,47,167,.18);
-  --hairline: inset 0 1px 0 rgba(255,255,255,.85);
-  --ring-focus: 0 0 0 3px rgba(0,47,167,.18);
-  --surface-hi: rgba(255,255,255,.7);
-}
 
 /* page backdrop — faint brand glow up top for depth */
 .v-app { background: radial-gradient(135% 90% at 50% -12%, color-mix(in srgb, var(--brand) 5%, var(--bg)) 0%, var(--bg) 55%); }
@@ -344,13 +771,10 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .m-btn--primary:active { background: var(--grad-brand-press); }
 .m-btn--ghost { box-shadow: none; }
 .m-chip--active { background: var(--grad-brand); border-color: transparent; box-shadow: var(--glow-brand); }
-/* base CSS hardcodes white text on the accent — amber needs dark text instead */
-.m-btn--primary, .m-chip--active, .v-fab, .v-clash__btn,
-.v-tab--center .v-tab__badge, .m-avatar { color: var(--on-accent); }
 
 /* surfaces → subtle top sheen + depth */
 .m-card { background: linear-gradient(180deg, var(--surface-hi), transparent), var(--surface); box-shadow: var(--elev-1), var(--hairline); }
-.m-input:focus { box-shadow: var(--ring-focus); }
+.m-input:focus, .m-input:focus-within { box-shadow: var(--ring-focus); }
 .m-sheet { box-shadow: var(--elev-3), var(--hairline); }
 .m-snackbar { box-shadow: var(--elev-2); }
 
@@ -358,22 +782,24 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-iconbtn { border: 1px solid var(--border); box-shadow: var(--hairline); transition: transform .08s var(--ease), background .15s; }
 .v-tabbar { box-shadow: var(--hairline); }
 .v-tab--center .v-tab__badge { background: var(--grad-brand); box-shadow: var(--glow-brand), var(--hairline); }
-.v-fab { background: var(--grad-brand); box-shadow: var(--glow-brand), var(--hairline); transition: transform .12s var(--ease), box-shadow .2s; }
-.v-fab:active { box-shadow: var(--elev-1); }
+.v-tab--center:active .v-tab__badge { box-shadow: var(--elev-1); }
 
 /* segmented control + filters */
 .v-seg { box-shadow: var(--hairline); }
 .v-seg button.v-seg--active { box-shadow: var(--elev-1); }
-.v-filter--on { box-shadow: var(--elev-1); }
 
 /* calendar event blocks → soft depth + glass sheen */
 .v-event { border-radius: 11px; box-shadow: var(--elev-1), inset 0 1px 0 rgba(255,255,255,.20); }
 .v-event::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(255,255,255,.16), transparent 42%); pointer-events: none; }
 .v-week__ev { box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+/* A cascaded block sits ON another block (see stackOverlaps), so it needs an edge
+   in the page's own colour — without one the sliver of the event behind reads as
+   part of the front block's fill instead of as a second event. Declared after the
+   rule above so it composes rather than being overridden by it. */
+.v-week__ev--stacked { box-shadow: -1.5px 0 0 var(--surface), 0 1px 3px rgba(0,0,0,.28); }
 
-/* month cells + floating bars */
+/* month cells + floating bars (today's border lives in the DUO layer below) */
 .v-daycell { box-shadow: var(--hairline); transition: transform .06s var(--ease), border-color .15s; }
-.v-daycell--today { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); }
 .v-selbar { box-shadow: var(--elev-2), var(--hairline); }
 
 /* atoms reused across EVERY page → consistent premium feel everywhere */
@@ -382,8 +808,7 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .statbadge { box-shadow: var(--hairline); }
 .stat.is-on { box-shadow: var(--elev-1); }
 .v-pick--on { box-shadow: var(--elev-1); }
-.v-notif--unread .v-notif__icon { background: var(--grad-brand); color: #fff; box-shadow: var(--glow-brand); }
-.v-filter { transition: border-color .15s var(--ease), box-shadow .2s; }
+.v-notif--unread .v-notif__icon { background: var(--grad-brand); color: var(--on-accent); box-shadow: var(--glow-brand); }
 .m-eventrow { transition: transform .08s var(--ease), border-color .15s; }
 .m-eventrow:active { transform: scale(.99); }
 
@@ -397,8 +822,8 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
    ============================================================ */
 .v-sidebar { display: none; }
 .v-sidebar__brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
-.v-sidebar__logo { width: 34px; height: 34px; border-radius: 10px; background: var(--grad-brand); color: var(--on-accent); display: grid; place-items: center; font-family: 'Syne','DM Sans',sans-serif; font-weight: 800; box-shadow: var(--glow-brand); }
-.v-sidebar__name { font-family: 'Syne','DM Sans',sans-serif; font-weight: 800; font-size: 1.15rem; }
+.v-sidebar__logo { width: 34px; height: 34px; border-radius: 10px; background: var(--grad-brand); color: var(--on-accent); display: grid; place-items: center; font-family: 'DM Sans', sans-serif; font-weight: 800; box-shadow: var(--glow-brand); }
+.v-sidebar__name { font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1.15rem; }
 .v-sidebar__nav { display: flex; flex-direction: column; gap: 3px; }
 .v-side__link { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; color: var(--text-2); text-decoration: none; font-weight: 600; font-size: 0.92rem; transition: background .15s, color .15s; }
 .v-side__link:hover { background: var(--surface-2); color: var(--text); }
@@ -406,7 +831,12 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .v-side__link svg { color: inherit; flex: 0 0 auto; }
 .v-sidebar__foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
 
-@media (min-width: 960px) {
+/* A lower height floor than the 768 block above, on purpose. No phone is 960px wide even
+   in landscape today, so this guard only matters for a future wide/folding device — and
+   raising it to 600 would start taking the sidebar away from real desktop windows that
+   merely happen to be short (a laptop with devtools docked at the bottom). 480 excludes
+   any plausible phone without touching those. */
+@media (min-width: 960px) and (min-height: 480px) {
   .v-app { max-width: none; margin: 0; border: none; padding-left: 240px; }
   .v-topbar { display: none; }
   .v-tabbar { display: none; }
@@ -417,19 +847,29 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
     background: var(--bar-bg);
     backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
     border-right: 1px solid var(--border);
+    /* full-height fixed column — let its own content scroll so the lower nav links
+       and the footer aren't clipped/unreachable on short desktop windows */
+    overflow-y: auto;
   }
+  /* The tab bar is hidden on desktop, but data-tabbar is stamped from `user` alone,
+     so --bottom-chrome still reserved 62px for a bar that isn't there — leaving the
+     snackbar floating ~62px too high over empty space. Reclaim that space here. */
+  :root[data-tabbar="on"] { --bottom-chrome: env(safe-area-inset-bottom); }
   /* .v-content is a flex item of .v-app — it must STRETCH (fill), not use
      margin:auto (auto margins on a flex item collapse it to content width).
      We center a normal block wrapper inside it instead. */
   .v-content { padding: 26px 40px; }
   .v-content__inner { max-width: 1040px; margin: 0 auto; }
-  .v-fab { right: 40px; bottom: 34px; }
   /* Sheet + snackbar centered over the content area (right of the 240px sidebar).
      Center via left/right/margin, NOT transform — the sheet's inline drag
      transform is translateY(), which would otherwise wipe out translateX(-50%). */
   .m-sheet { left: 240px; right: 0; margin-inline: auto; max-width: 460px; border-radius: 22px; bottom: 24px; }
   .m-snackbar { left: 240px; right: 0; margin-inline: auto; max-width: 460px; transform: none; }
-  .v-selbar { left: calc(240px + 24px); right: 24px; bottom: 24px; }
+  /* .v-selbar is in normal flow (never position:fixed — that reintroduced the
+     "bar covers the slot you just picked" bug), so left/right/bottom were inert here.
+     What survived was the 436px cap from the 768px rule, leaving a narrow centred
+     strap under a full-width day grid. Lift the cap so the strap spans the column. */
+  .v-selbar { max-width: none; margin-inline: 0; }
 }
 
 /* ============================================================
@@ -437,7 +877,7 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
    display moments only; DM Sans remains the UI/body face. Appended
    last so it overrides the earlier Syne/DM Sans heading rules.
    ============================================================ */
-.v-topbar__title, .v-cal-title, .m-sheet__title, .v-dayhead__num, .v-sidebar__name {
+.v-topbar__title, .v-cal-title, .m-sheet__title, .v-dayhead__num, .v-sidebar__name, .v-h {
   font-family: 'Fraunces', Georgia, serif;
   font-weight: 600;
   letter-spacing: .01em;
@@ -447,13 +887,81 @@ textarea.m-input { resize: vertical; min-height: 60px; line-height: 1.45; paddin
 .m-sheet__title { font-size: 1.3rem; }
 
 /* ============================================================
-   DUO LAYER — every palette is a designed PAIR with a role split:
-   the brand colour marks ACTION (buttons, links, FAB), the second
-   colour marks TIME (today's date, the now line). Falls back to
-   brand if a palette defines no secondary.
+   CALENDAR LAYOUT — Google-Calendar scrolling: the title, view
+   switcher, filters and date row stay PINNED; only the time grid
+   scrolls, inside its own window. Without this, auto-scrolling to
+   8 AM shoved all the controls off the top of the page.
+   ============================================================ */
+.v-content--cal { display: flex; flex-direction: column; overflow: hidden; }
+.v-content--cal .v-content__inner { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; }
+.v-calpage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* padding-top: the first hour's label ("8 AM") and a top drag handle render a
+   few px ABOVE the grid's edge (absolute, negative top) — without headroom the
+   scroller clips them, which read as "8 AM hidden behind the back button".
+   padding-bottom gives the LAST hour the same room to clear the fold. */
+/* scrollbar hidden: on desktop a classic scrollbar stole ~15px of content
+   width from the grid (which scrolls) but not from the pinned day-header row
+   (which doesn't), so week and month day columns drifted apart. Hiding it keeps
+   content full-width everywhere — mobile already uses 0-width overlay bars. */
+.v-gridwrap { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: 16px; padding-bottom: 20px; scrollbar-width: none; }
+.v-gridwrap::-webkit-scrollbar { width: 0; height: 0; display: none; }
+/* no topbar on the signed-in calendar — the content clears the notch itself */
+.v-content--notop { padding-top: calc(env(safe-area-inset-top) + 12px); }
+/* signed out there is no tab bar — give that reserved strip back to the grid.
+   Keeps the safe-area inset: without it the last row sat under the home
+   indicator. !important because the 960px .v-content rule comes earlier in the
+   file but at equal specificity, so source order alone made this fragile. */
+.v-content--notab { padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important; }
+
+/* (the shy-chrome collapse — scroll down hides the secondary rows, scroll up
+   restores them — is driven by inline styles in CalendarV3, see shyStyle()) */
+
+/* ============================================================
+   DUO LAYER — the two colours have fixed roles: the brand blue
+   marks ACTION (buttons, links, FAB); --accent-2 (ochre/amber)
+   marks TIME (today's date, the now line). Keeping "where am I in
+   time" visually distinct from "what can I press".
    ============================================================ */
 .v-daycell--today .v-daynum,
 .v-dayhead__num--today,
-.v-week__dayhd--today .v-week__num { color: var(--accent-2, var(--brand)); }
-.v-daycell--today { border-color: color-mix(in srgb, var(--accent-2, var(--brand)) 50%, var(--border)); }
-.v-nowline, .v-nowline::before { background: var(--accent-2, var(--brand)); }
+.v-week__dayhd--today .v-week__num { color: var(--accent-2); }
+.v-daycell--today { border-color: color-mix(in srgb, var(--accent-2) 50%, var(--border)); }
+.v-nowline, .v-nowline::before { background: var(--accent-2); }
+
+/* ============================================================
+   SLOT-REQUEST ACTIONS — single-word buttons with a colour code, so a
+   faculty member can tell them apart at a glance instead of reading
+   three "mini-sentences".
+     Move    = blue   (the constructive option: keep your class, shift it)
+     Cancel  = grey   (neutral: give the slot up)
+     Decline = red    (say no) — a LIGHTER red than --danger, which was
+                       too dark to read as button text on both themes.
+   ============================================================ */
+.act { flex: 1 1 0; min-width: 0; font-weight: 700; }
+.act--move    { background: var(--brand); color: var(--on-accent); }
+.act--move:active { background: var(--brand-press); }
+.act--cancel  { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.act--decline { background: transparent; color: var(--decline); border: 1px solid var(--decline-bd); }
+.act--decline:active { background: var(--decline-bg); }
+
+/* Decline red — deliberately lighter/more legible than --danger. */
+:root { --decline: #ff9d9d; --decline-bd: rgba(255,157,157,.45); --decline-bg: rgba(255,157,157,.12); }
+[data-theme="light"] { --decline: #d4453b; --decline-bd: rgba(212,69,59,.40); --decline-bg: rgba(212,69,59,.08); }
+
+/* CONFIRMED / accepted needs a real signifier, not just grey text. */
+.statbadge.stat--confirmed,
+.m-badge.is-confirmed {
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+  font-weight: 700;
+}
+.statbadge.stat--confirmed::before,
+.m-badge.is-confirmed::before { content: '✓ '; }
+
+/* Clash panel alignment: the room row is a 2-column flex with no wrapping, so a
+   long "601H-N · held by Dr Somebody" line squashed the Request link (or pushed it
+   off) instead of dropping to the next line. Additive — the original rules above
+   keep the card look. */
+.v-clash__row { flex-wrap: wrap; row-gap: 6px; }
+.v-clash__room { overflow-wrap: anywhere; flex: 1 1 auto; }
+.v-clash__row > .m-link, .v-clash__row > em { flex: 0 0 auto; }

@@ -53,7 +53,7 @@ export function eventToICS(evt) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//RSP//Scheduler//EN',
+    'PRODID:-//Scheduler//Scheduler//EN',
     'CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
     `UID:${esc(uid)}`,

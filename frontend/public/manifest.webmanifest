@@ -1,6 +1,6 @@
 {
-  "name": "RSP — Resource Scheduling Platform",
-  "short_name": "RSP",
+  "name": "Scheduler",
+  "short_name": "Scheduler",
   "description": "Department scheduling — rooms, classes, events.",
   "start_url": "/v3.html",
   "scope": "/",

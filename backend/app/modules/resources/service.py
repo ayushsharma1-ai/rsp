@@ -44,8 +44,19 @@ class ResourceService:
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def _validate_capacity(capacity):
+        if capacity is not None and capacity < 0:
+            raise HTTPException(status_code=400, detail="Capacity can't be negative")
+
     def create(self, data: ResourceCreate, actor: User) -> Resource:
-        resource = Resource(**data.model_dump())
+        payload = data.model_dump()
+        name = (payload.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name is required")
+        payload["name"] = name
+        self._validate_capacity(payload.get("capacity"))
+        resource = Resource(**payload)
         self.db.add(resource)
         self.db.flush()
         self._audit(actor, "resource.created", "Resource", resource.id, None, data.model_dump())
@@ -70,10 +81,21 @@ class ResourceService:
 
     def update(self, resource_id: str, data: ResourceUpdate, actor: User) -> Resource:
         r = self.get(resource_id)
-        old = {k: getattr(r, k) for k in data.model_dump(exclude_none=True)}
-        for field, value in data.model_dump(exclude_none=True).items():
+        # exclude_UNSET (not exclude_none): only fields the client actually sent are
+        # applied — but an explicitly-null field IS included, so an admin CAN clear an
+        # optional field (capacity/location/description) back to empty. exclude_none made
+        # that impossible: null was dropped, so a set capacity could never be removed.
+        changes = data.model_dump(exclude_unset=True)
+        if "name" in changes:
+            nm = (changes["name"] or "").strip()
+            if not nm:
+                raise HTTPException(status_code=400, detail="Name can't be blank")
+            changes["name"] = nm
+        self._validate_capacity(changes.get("capacity"))
+        old = {k: getattr(r, k) for k in changes}
+        for field, value in changes.items():
             setattr(r, field, value)
-        self._audit(actor, "resource.updated", "Resource", resource_id, old, data.model_dump(exclude_none=True))
+        self._audit(actor, "resource.updated", "Resource", resource_id, old, changes)
         self.db.commit()
         self.db.refresh(r)
         return r

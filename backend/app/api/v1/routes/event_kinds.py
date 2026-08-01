@@ -9,7 +9,7 @@ Regular logged-in users CANNOT create kinds — only pick from existing ones.
 
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -37,3 +37,12 @@ def create_kind(data: EventKindCreate, db: Session = Depends(get_db),
 def update_kind(kind_id: str, data: EventKindUpdate, db: Session = Depends(get_db),
                 current_user: User = Depends(require_admin)):
     return EventKindService(db).update_kind(kind_id, data)
+
+
+@router.delete("/{kind_id}", status_code=204)
+def delete_kind(kind_id: str, db: Session = Depends(get_db),
+                current_user: User = Depends(require_admin)):
+    # Hard-delete an UNUSED kind (409 if any event still references it). Lets an admin
+    # remove a typo'd/obsolete kind without it lingering forever in the create picker.
+    EventKindService(db).delete_kind(kind_id)
+    return Response(status_code=204)
